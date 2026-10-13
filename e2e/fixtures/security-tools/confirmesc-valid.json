@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "hostname": "fixture-host.invalid",
+    "user": "Synthetic user scopeweaver-secret-canary-01",
+    "kernel": "synthetic-kernel"
+  },
+  "duration": 0.25,
+  "findings": [
+    {
+      "check_id": "synthetic-confirmed",
+      "category": "known_cves",
+      "title": "Synthetic observation scopeweaver-secret-canary-01",
+      "confidence": "CONFIRMED",
+      "description": "Untrusted producer certainty, not local confirmation; scopeweaver-secret-canary-01",
+      "evidence": { "note": "Synthetic evidence scopeweaver-secret-canary-01" },
+      "remediation": "Synthetic recommendation scopeweaver-secret-canary-01",
+      "references": ["https://reference.invalid/synthetic"],
+      "cve": "CVE-2021-4034",
+      "exploit_command": "Inert synthetic command text scopeweaver-secret-canary-01"
+    },
+    {
+      "check_id": "synthetic-likely",
+      "category": "known_cves",
+      "title": "Synthetic likely observation",
+      "confidence": "LIKELY",
+      "description": "Synthetic context only",
+      "evidence": {},
+      "remediation": "",
+      "references": [],
+      "cve": "CVE-2022-0847",
+      "exploit_command": null
+    },
+    {
+      "check_id": "synthetic-info",
+      "category": "group_membership",
+      "title": "Synthetic informational observation",
+      "confidence": "INFO",
+      "description": "Synthetic context only",
+      "evidence": {},
+      "remediation": "",
+      "references": [],
+      "cve": null,
+      "exploit_command": null
+    }
+  ],
+  "errors": {}
+}
