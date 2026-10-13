@@ -265,6 +265,9 @@ ON CONFLICT (name) DO NOTHING`,
 	// NOTE: the placeholder ScopeSentry data-source MCP (empty URL + empty X-API-Key,
 	// disabled) is seeded directly in schema.sql §F so a raw `psql < schema.sql` init
 	// also gets it. schema.sql is Exec'd on every startup, so it stays idempotent.
+	if err := d.reportMCPProviderCollisions(); err != nil {
+		return err
+	}
 	if err := d.seedBuiltinSkillVisibility(); err != nil {
 		return locale.Errorf("seed skill visibility: %w", err)
 	}

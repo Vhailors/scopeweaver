@@ -247,27 +247,31 @@ func (s *Server) toolUpdateCustomTool(langs ...locale.Lang) actool.CoreTool {
 // ---- MCP ----
 
 type mcpToolInput struct {
-	ID        int64           `json:"id"`
-	Name      string          `json:"name"`
-	Transport string          `json:"transport"`
-	Command   string          `json:"command"`
-	Args      json.RawMessage `json:"args"`
-	Env       json.RawMessage `json:"env"`
-	URL       string          `json:"url"`
-	Enabled   *bool           `json:"enabled"`
-	Insecure  *bool           `json:"insecure"`
+	ProviderKind   string          `json:"provider_kind"`
+	SourceRevision string          `json:"source_revision"`
+	ID             int64           `json:"id"`
+	Name           string          `json:"name"`
+	Transport      string          `json:"transport"`
+	Command        string          `json:"command"`
+	Args           json.RawMessage `json:"args"`
+	Env            json.RawMessage `json:"env"`
+	URL            string          `json:"url"`
+	Enabled        *bool           `json:"enabled"`
+	Insecure       *bool           `json:"insecure"`
 }
 
 func mcpSchema(withID bool, langs ...locale.Lang) map[string]any {
 	props := map[string]any{
-		"name":      strParam(locale.Text(locale.First(langs), "MCP server name")),
-		"transport": strParam("stdio | http / sse"),
-		"command":   strParam(locale.Text(locale.First(langs), "stdio launch command, such as npx")),
-		"args":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": locale.Text(locale.First(langs), "Command argument array")},
-		"env":       map[string]any{"type": "object", "description": locale.Text(locale.First(langs), "Environment variables {KEY:VALUE}")},
-		"url":       strParam(locale.Text(locale.First(langs), "HTTP/SSE URL")),
-		"enabled":   map[string]any{"type": "boolean", "description": locale.Text(locale.First(langs), "Enabled, default true")},
-		"insecure":  map[string]any{"type": "boolean", "description": locale.Text(locale.First(langs), "HTTP: skip TLS certificate verification for self-signed certificates; default false")},
+		"provider_kind":   strParam(locale.T(locale.First(langs), "mcp.provider.kind_parameter")),
+		"source_revision": strParam(locale.T(locale.First(langs), "mcp.provider.revision_parameter")),
+		"name":            strParam(locale.Text(locale.First(langs), "MCP server name")),
+		"transport":       strParam("stdio | http / sse"),
+		"command":         strParam(locale.Text(locale.First(langs), "stdio launch command, such as npx")),
+		"args":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": locale.Text(locale.First(langs), "Command argument array")},
+		"env":             map[string]any{"type": "object", "description": locale.Text(locale.First(langs), "Environment variables {KEY:VALUE}")},
+		"url":             strParam(locale.Text(locale.First(langs), "HTTP/SSE URL")),
+		"enabled":         map[string]any{"type": "boolean", "description": locale.T(locale.First(langs), "mcp.provider.enabled_parameter")},
+		"insecure":        map[string]any{"type": "boolean", "description": locale.Text(locale.First(langs), "HTTP: skip TLS certificate verification for self-signed certificates; default false")},
 	}
 	required := []string{"name", "transport"}
 	if withID {
@@ -278,7 +282,7 @@ func mcpSchema(withID bool, langs ...locale.Lang) map[string]any {
 }
 
 func (a mcpToolInput) toDB() *db.MCPServer {
-	enabled := true
+	enabled := a.ProviderKind == ""
 	if a.Enabled != nil {
 		enabled = *a.Enabled
 	}
@@ -287,17 +291,20 @@ func (a mcpToolInput) toDB() *db.MCPServer {
 		insecure = *a.Insecure
 	}
 	return &db.MCPServer{
+		ProviderKind: a.ProviderKind, SourceRevision: a.SourceRevision,
 		ID: a.ID, Name: a.Name, Transport: a.Transport, Command: a.Command,
 		Args: a.Args, Env: a.Env, URL: a.URL, Enabled: enabled, Insecure: insecure,
 	}
 }
 
 func (s *Server) toolCreateMCP(langs ...locale.Lang) actool.CoreTool {
-	return wrTool("create_mcp", locale.Text(locale.First(langs), "Create a stdio/http/sse MCP server. Grant tool visibility to agents after creation."),
+	return wrTool("create_mcp", locale.T(locale.First(langs), "mcp.provider.create_description"),
 		mcpSchema(false, langs...),
 		func(ctx context.Context, in json.RawMessage) (actool.Result, error) {
 			var a mcpToolInput
-			_ = json.Unmarshal(in, &a)
+			if err := json.Unmarshal(in, &a); err != nil {
+				return actool.Errorf(locale.T(locale.FromContext(ctx), "mcp.provider.invalid_json")), nil
+			}
 			a.ID = 0
 			if strings.TrimSpace(a.Name) == "" || strings.TrimSpace(a.Transport) == "" {
 				return actool.Errorf(locale.Text(locale.First(langs), "name and transport are required")), nil
@@ -315,7 +322,9 @@ func (s *Server) toolUpdateMCP(langs ...locale.Lang) actool.CoreTool {
 		mcpSchema(true, langs...),
 		func(ctx context.Context, in json.RawMessage) (actool.Result, error) {
 			var a mcpToolInput
-			_ = json.Unmarshal(in, &a)
+			if err := json.Unmarshal(in, &a); err != nil {
+				return actool.Errorf(locale.T(locale.FromContext(ctx), "mcp.provider.invalid_json")), nil
+			}
 			if a.ID == 0 {
 				return actool.Errorf(locale.Text(locale.First(langs), "id is required")), nil
 			}
@@ -324,4 +333,34 @@ func (s *Server) toolUpdateMCP(langs ...locale.Lang) actool.CoreTool {
 			}
 			return actool.Text(fmt.Sprintf("mcp updated: id=%d", a.ID)), nil
 		})
+}
+
+func init() {
+	locale.RegisterAll(map[string]map[locale.Lang]string{
+		"mcp.provider.enabled_parameter": {
+			locale.En:     "Enabled: defaults to true for generic MCP and false for catalog providers.",
+			locale.Ko:     "활성화 여부: 일반 MCP의 기본값은 true이고 카탈로그 제공자의 기본값은 false입니다.",
+			locale.ZhHans: "是否启用：通用 MCP 默认为 true，目录提供方默认为 false。",
+		},
+		"mcp.provider.create_description": {
+			locale.En:     "Create a generic stdio/http/sse MCP server or a catalog-only stdio provider. Catalog providers default to disabled and do not grant upstream tool execution.",
+			locale.Ko:     "일반 stdio/http/sse MCP 서버 또는 카탈로그 전용 stdio 제공자를 생성합니다. 카탈로그 제공자는 기본적으로 비활성화되며 업스트림 도구 실행 권한을 부여하지 않습니다.",
+			locale.ZhHans: "创建通用 stdio/http/sse MCP 服务器或仅供目录使用的 stdio 提供方。目录提供方默认禁用，不授予上游工具执行权限。",
+		},
+		"mcp.provider.kind_parameter": {
+			locale.En:     "Stable provider kind: empty for generic MCP, yeepforge or adstrike for a catalog-only stdio provider. Immutable after creation; tagged providers default to disabled.",
+			locale.Ko:     "고정 제공자 종류: 일반 MCP는 빈 값, 카탈로그 전용 stdio 제공자는 yeepforge 또는 adstrike입니다. 생성 후 변경할 수 없으며 지정된 제공자는 기본적으로 비활성화됩니다.",
+			locale.ZhHans: "固定提供方类型：通用 MCP 为空，仅供目录使用的 stdio 提供方为 yeepforge 或 adstrike。创建后不可更改；指定类型的提供方默认禁用。",
+		},
+		"mcp.provider.revision_parameter": {
+			locale.En:     "Expected source revision: empty or lowercase SHA-1. This is configuration, not a verified executable digest.",
+			locale.Ko:     "예상 소스 리비전: 빈 값 또는 소문자 SHA-1입니다. 설정 값이며 검증된 실행 파일 다이제스트가 아닙니다.",
+			locale.ZhHans: "预期源码修订版本：为空或小写 SHA-1。这是配置值，不是已验证的可执行文件摘要。",
+		},
+		"mcp.provider.invalid_json": {
+			locale.En:     "Invalid MCP configuration JSON.",
+			locale.Ko:     "MCP 설정 JSON이 올바르지 않습니다.",
+			locale.ZhHans: "MCP 配置 JSON 无效。",
+		},
+	})
 }

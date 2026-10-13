@@ -806,20 +806,23 @@ func (d *DB) ListPromptVersions(agentID int64) ([]PromptVersion, error) {
 // ---------- MCP servers ----------
 
 type MCPServer struct {
-	ID        int64           `json:"id"`
-	Name      string          `json:"name"`
-	Transport string          `json:"transport"`
-	Command   string          `json:"command,omitempty"`
-	Args      json.RawMessage `json:"args"`
-	Env       json.RawMessage `json:"env"`
-	URL       string          `json:"url,omitempty"`
-	Enabled   bool            `json:"enabled"`
-	Insecure  bool            `json:"insecure"`        // http: skip TLS cert verification (self-signed servers, issue #108)
-	Tools     []string        `json:"tools,omitempty"` // cached tool names (mcp_tools_cache)
+	ProviderKind   string          `json:"provider_kind"`
+	SourceRevision string          `json:"source_revision"` // configured source SHA, not measured executable provenance
+	UpdatedAt      time.Time       `json:"updated_at"`
+	ID             int64           `json:"id"`
+	Name           string          `json:"name"`
+	Transport      string          `json:"transport"`
+	Command        string          `json:"command,omitempty"`
+	Args           json.RawMessage `json:"args"`
+	Env            json.RawMessage `json:"env"`
+	URL            string          `json:"url,omitempty"`
+	Enabled        bool            `json:"enabled"`
+	Insecure       bool            `json:"insecure"`        // http: skip TLS cert verification (self-signed servers, issue #108)
+	Tools          []string        `json:"tools,omitempty"` // cached tool names (mcp_tools_cache)
 }
 
 func (d *DB) ListMCP() ([]*MCPServer, error) {
-	rows, err := d.Query(`SELECT id,name,transport,COALESCE(command,''),args,env,COALESCE(url,''),enabled,insecure FROM mcp_servers ORDER BY id`)
+	rows, err := d.Query(`SELECT id,name,transport,COALESCE(command,''),args,env,COALESCE(url,''),enabled,insecure,provider_kind,source_revision,updated_at FROM mcp_servers ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -827,7 +830,7 @@ func (d *DB) ListMCP() ([]*MCPServer, error) {
 	for rows.Next() {
 		var m MCPServer
 		var args, env []byte
-		if err := rows.Scan(&m.ID, &m.Name, &m.Transport, &m.Command, &args, &env, &m.URL, &m.Enabled, &m.Insecure); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name, &m.Transport, &m.Command, &args, &env, &m.URL, &m.Enabled, &m.Insecure, &m.ProviderKind, &m.SourceRevision, &m.UpdatedAt); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -908,6 +911,9 @@ ON CONFLICT (server_id, tool_name) DO UPDATE SET description=EXCLUDED.descriptio
 }
 
 func (d *DB) SaveMCP(m *MCPServer) (int64, error) {
+	if err := validateMCPProvider(m); err != nil {
+		return 0, err
+	}
 	args, env := string(m.Args), string(m.Env)
 	if args == "" {
 		args = "[]"
@@ -917,13 +923,19 @@ func (d *DB) SaveMCP(m *MCPServer) (int64, error) {
 	}
 	if m.ID == 0 {
 		var id int64
-		err := d.QueryRow(`INSERT INTO mcp_servers(name,transport,command,args,env,url,enabled,insecure) VALUES ($1,$2,NULLIF($3,''),$4,$5,NULLIF($6,''),$7,$8) RETURNING id`,
-			m.Name, m.Transport, m.Command, args, env, m.URL, m.Enabled, m.Insecure).Scan(&id)
+		err := d.QueryRow(`INSERT INTO mcp_servers(name,transport,command,args,env,url,enabled,insecure,provider_kind,source_revision) VALUES ($1,$2,NULLIF($3,''),$4,$5,NULLIF($6,''),$7,$8,$9,$10) RETURNING id`,
+			m.Name, m.Transport, m.Command, args, env, m.URL, m.Enabled, m.Insecure, m.ProviderKind, m.SourceRevision).Scan(&id)
 		return id, err
 	}
-	_, err := d.Exec(`UPDATE mcp_servers SET name=$1,transport=$2,command=NULLIF($3,''),args=$4,env=$5,url=NULLIF($6,''),enabled=$7,insecure=$8 WHERE id=$9`,
-		m.Name, m.Transport, m.Command, args, env, m.URL, m.Enabled, m.Insecure, m.ID)
-	return m.ID, err
+	// Match identity in the write itself: a stale caller cannot retag a row or
+	// claim success after deletion. provider_kind never changes on update.
+	var id int64
+	err := d.QueryRow(`UPDATE mcp_servers SET name=$1,transport=$2,command=NULLIF($3,''),args=$4,env=$5,url=NULLIF($6,''),enabled=$7,insecure=$8,source_revision=$10 WHERE id=$9 AND provider_kind=$11 RETURNING id`,
+		m.Name, m.Transport, m.Command, args, env, m.URL, m.Enabled, m.Insecure, m.ID, m.SourceRevision, m.ProviderKind).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, &MCPValidationError{Code: "identity"}
+	}
+	return id, err
 }
 
 func (d *DB) DeleteMCP(id int64) error {

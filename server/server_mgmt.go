@@ -884,19 +884,24 @@ func (s *Server) pgSaveMCP(w http.ResponseWriter, r *http.Request) {
 	}
 	var m db.MCPServer
 	if err := decode(r, &m); err != nil {
-		writeError(w, 400, err)
+		writeErr(w, http.StatusBadRequest, locale.T(responseLanguage(w), "mcp.provider.invalid_json"))
 		return
 	}
 	isNew := m.ID == 0
 	id, err := pg.SaveMCP(&m)
 	if err != nil {
+		var validation *db.MCPValidationError
+		if errors.As(err, &validation) {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
 		writeError(w, 500, err)
 		return
 	}
 	// On initial add, auto-discover + cache the tool list so the UI shows it right
 	// away (bounded so a slow/broken server can't hang the request). Skipped on
 	// plain updates (e.g. enable toggles) to avoid re-spawning the server each time.
-	if isNew && m.Enabled {
+	if isNew && m.Enabled && m.ProviderKind == "" {
 		m.ID = id
 		ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 		if derr := s.discoverAndCacheMCP(ctx, &m); derr != nil {

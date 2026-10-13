@@ -850,6 +850,30 @@ ALTER TABLE mcp_servers ADD CONSTRAINT mcp_servers_transport_check
     CHECK (transport IN ('stdio','http','sse'));
 -- Add columns to older databases; schema.sql executes on every startup.
 ALTER TABLE mcp_servers ADD COLUMN IF NOT EXISTS insecure BOOLEAN NOT NULL DEFAULT false;
+-- Catalog-only identity is additive; existing generic rows keep their transports.
+ALTER TABLE mcp_servers ADD COLUMN IF NOT EXISTS provider_kind TEXT NOT NULL DEFAULT '';
+ALTER TABLE mcp_servers ADD COLUMN IF NOT EXISTS source_revision TEXT NOT NULL DEFAULT '';
+ALTER TABLE mcp_servers DROP CONSTRAINT IF EXISTS mcp_servers_provider_kind_check;
+ALTER TABLE mcp_servers ADD CONSTRAINT mcp_servers_provider_kind_check
+    CHECK (provider_kind IN ('', 'yeepforge', 'adstrike'));
+ALTER TABLE mcp_servers DROP CONSTRAINT IF EXISTS mcp_servers_source_revision_check;
+ALTER TABLE mcp_servers ADD CONSTRAINT mcp_servers_source_revision_check
+    CHECK (source_revision = '' OR source_revision ~ '^[0-9a-f]{40}$');
+ALTER TABLE mcp_servers DROP CONSTRAINT IF EXISTS mcp_servers_provider_stdio_check;
+ALTER TABLE mcp_servers ADD CONSTRAINT mcp_servers_provider_stdio_check
+    CHECK (provider_kind = '' OR (transport = 'stdio' AND COALESCE(url, '') = '' AND NOT insecure));
+
+CREATE OR REPLACE FUNCTION preserve_mcp_provider_kind() RETURNS trigger AS $$
+BEGIN
+    IF NEW.provider_kind IS DISTINCT FROM OLD.provider_kind THEN
+        RAISE EXCEPTION 'mcp_provider_identity_immutable' USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_mcp_provider_identity ON mcp_servers;
+CREATE TRIGGER trg_mcp_provider_identity BEFORE UPDATE ON mcp_servers
+    FOR EACH ROW EXECUTE FUNCTION preserve_mcp_provider_kind();
 DROP TRIGGER IF EXISTS trg_mcp_upd ON mcp_servers;
 CREATE TRIGGER trg_mcp_upd BEFORE UPDATE ON mcp_servers
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -859,6 +883,13 @@ CREATE TRIGGER trg_mcp_upd BEFORE UPDATE ON mcp_servers
 -- Insert only if absent, never replacing configured/enabled servers, since schema.sql runs every startup.
 INSERT INTO mcp_servers (name, transport, url, env, enabled)
 VALUES ('ScopeSentry', 'http', NULL, '{"X-API-Key":""}', false)
+ON CONFLICT (name) DO NOTHING;
+
+-- Never convert name collisions or recreate a template after a label rename.
+INSERT INTO mcp_servers (name, transport, provider_kind, enabled)
+SELECT name, 'stdio', kind, false
+FROM (VALUES ('YeepForge', 'yeepforge'), ('AdStrike', 'adstrike')) AS providers(name, kind)
+WHERE NOT EXISTS (SELECT 1 FROM mcp_servers WHERE provider_kind = providers.kind)
 ON CONFLICT (name) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS mcp_tools_cache (
