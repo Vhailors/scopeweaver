@@ -241,6 +241,12 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_expnodes_part     ON exploration_nodes(exploration_id, kind);
 CREATE INDEX IF NOT EXISTS idx_expnodes_frontier ON exploration_nodes(exploration_id, priority DESC)
     WHERE kind='intent' AND state='open';
+
+-- Assessment imports are immutable and byte-specific within one exploration.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_expnodes_assessment_import
+    ON exploration_nodes(exploration_id, (payload->>'assessment_id'))
+    WHERE kind='fact' AND payload ? 'assessment_id' AND payload ? 'assessment_import';
+
 DROP TRIGGER IF EXISTS trg_expnodes_upd ON exploration_nodes;
 CREATE TRIGGER trg_expnodes_upd BEFORE UPDATE ON exploration_nodes
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
