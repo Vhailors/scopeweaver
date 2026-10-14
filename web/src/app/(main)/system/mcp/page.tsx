@@ -4,7 +4,7 @@ import { translate as swt } from "@/i18n/runtime";
 import { useI18n } from "@/i18n";
 import * as React from "react";
 import { toast } from "sonner";
-import { PlusIcon, RefreshCwIcon, ServerIcon, Trash2Icon } from "lucide-react";
+import { PlusIcon, RefreshCwIcon, ServerIcon, ShieldCheckIcon, Trash2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
   Sheet,
   SheetContent,
@@ -23,7 +24,8 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
-import type { MCPServer, MCPTool, Agent } from "@/lib/types";
+import type { MessageKey } from "@/i18n";
+import type { MCPCatalogState, MCPCatalogStatus, MCPProviderKind, MCPServer, MCPTool, Agent } from "@/lib/types";
 
 type Transport = "stdio" | "http" | "sse";
 type FormState = {
@@ -34,6 +36,8 @@ type FormState = {
   url: string;
   env: string;
   insecure: boolean;
+  providerKind: MCPProviderKind;
+  sourceRevision: string;
 };
 const emptyForm: FormState = {
   name: "",
@@ -43,11 +47,28 @@ const emptyForm: FormState = {
   url: "",
   env: "",
   insecure: false,
+  providerKind: "",
+  sourceRevision: "",
 };
+
+const catalogStatusKeys: Record<MCPCatalogState, MessageKey> = {
+  not_configured: "interface.mcpCatalogStatusNotConfigured",
+  disabled: "interface.mcpCatalogStatusDisabled",
+  not_discovered: "interface.mcpCatalogStatusNotDiscovered",
+  discovered: "interface.mcpCatalogStatusDiscovered",
+  stale: "interface.mcpCatalogStatusStale",
+  unavailable: "interface.mcpCatalogStatusUnavailable",
+};
+
+function parseProviderKind(value: string): MCPProviderKind {
+  if (value === "yeepforge" || value === "adstrike") return value;
+
+  return "";
+}
 
 export default function MCPPage() {
   "use no memo";
-  const { t: swt, locale: swLocale } = useI18n();
+  const { t: swt, locale: swLocale, fmt } = useI18n();
 
   const [servers, setServers] = React.useState<MCPServer[]>([]);
   const [agents, setAgents] = React.useState<Agent[]>([]);
@@ -61,8 +82,17 @@ export default function MCPPage() {
   const [tools, setTools] = React.useState<MCPTool[]>([]);
   const [toolsLoading, setToolsLoading] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
+  // null until the stored value is known; absent setting means off.
+  const [reportsEnabled, setReportsEnabled] = React.useState<boolean | null>(null);
+  const [savingReports, setSavingReports] = React.useState(false);
+  const current = editing ? (servers.find((s) => s.id === editing.id) ?? editing) : null;
+  const tagged = form.providerKind !== "";
 
   const load = React.useCallback(() => {
+    api
+      .settings()
+      .then((s) => setReportsEnabled(s.security_reports_enabled === true))
+      .catch((e: Error) => toast.error(swt("interface.mcpSecurityReportsSaveFailed") + e.message));
     api.agents().then(setAgents).catch(() => {});
     api
       .mcpServers()
@@ -76,7 +106,7 @@ export default function MCPPage() {
         );
       })
       .catch(() => {});
-  }, []);
+  }, [swt]);
   React.useEffect(() => {
     load();
   }, [load]);
@@ -122,6 +152,8 @@ export default function MCPPage() {
       url: s.url ?? "",
       env: envToText(s.env),
       insecure: s.insecure ?? false,
+      providerKind: s.provider_kind ?? "",
+      sourceRevision: s.source_revision ?? "",
     });
     setTab("config");
     setOpen(true);
@@ -171,10 +203,13 @@ export default function MCPPage() {
               env: parseEnv(form.env),
               insecure: false,
             };
+      // Kind is sent unchanged so the server matches identity; tagged rows start disabled.
       await api.saveMcpServer({
         ...(editing ? { id: editing.id } : {}),
         name: form.name.trim(),
-        enabled: editing ? editing.enabled : true,
+        enabled: editing ? editing.enabled : !tagged,
+        provider_kind: form.providerKind,
+        source_revision: form.sourceRevision.trim(),
         ...base,
       });
       toast.success(editing ? swt("interface.m0377") : swt("interface.m1449"));
@@ -187,8 +222,48 @@ export default function MCPPage() {
     }
   }
 
+  async function refreshCatalog(id: number) {
+    setRefreshing(true);
+
+    try {
+      const status = await api.refreshMcpCatalog(id);
+      toast.success(swt("interface.mcpCatalogRefreshed", { count: status.cache?.tools.length ?? 0 }));
+    } catch (e) {
+      toast.error(swt("interface.mcpCatalogRefreshFailed") + (e instanceof Error ? e.message : ""));
+    } finally {
+      setRefreshing(false);
+      load();
+    }
+  }
+
+  async function toggleReports(next: boolean) {
+    setSavingReports(true);
+
+    try {
+      const saved = await api.setSettings({ security_reports_enabled: next });
+      setReportsEnabled(saved.security_reports_enabled === true);
+      toast.success(swt("interface.mcpSecurityReportsSaved"));
+    } catch (e) {
+      toast.error(swt("interface.mcpSecurityReportsSaveFailed") + (e instanceof Error ? e.message : ""));
+    } finally {
+      setSavingReports(false);
+    }
+  }
+
+  function setProviderKind(value: string) {
+    const kind = parseProviderKind(value);
+    setF(kind ? { providerKind: kind, transport: "stdio", insecure: false } : { providerKind: kind });
+  }
+
   async function refreshTools() {
     if (!editing) return;
+
+    if (editing.provider_kind) {
+      await refreshCatalog(editing.id);
+
+      return;
+    }
+
     setRefreshing(true);
     try {
       const t = await api.refreshMcpServer(editing.id);
@@ -237,8 +312,35 @@ export default function MCPPage() {
     return (
       <div className="grid gap-4 py-4">
         <div className="grid gap-2">
+          <Label htmlFor="m-provider-kind">{swt("interface.mcpProviderKind")}</Label>
+          {editing ? (
+            <Input
+              id="m-provider-kind"
+              className="font-mono"
+              readOnly
+              aria-describedby="m-provider-kind-hint"
+              value={form.providerKind || swt("interface.mcpProviderKindGeneric")}
+            />
+          ) : (
+            <NativeSelect
+              id="m-provider-kind"
+              className="w-full"
+              aria-describedby="m-provider-kind-hint"
+              value={form.providerKind}
+              onChange={(e) => setProviderKind(e.target.value)}
+            >
+              <NativeSelectOption value="">{swt("interface.mcpProviderKindGeneric")}</NativeSelectOption>
+              <NativeSelectOption value="yeepforge">YeepForge</NativeSelectOption>
+              <NativeSelectOption value="adstrike">AdStrike</NativeSelectOption>
+            </NativeSelect>
+          )}
+          <p id="m-provider-kind-hint" className="text-muted-foreground text-xs">
+            {swt("interface.mcpProviderKindHint")}
+          </p>
+        </div>
+        <div className="grid gap-2">
           <Label>{swt("interface.m1455")}</Label>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant={form.transport === "stdio" ? "default" : "outline"}
@@ -248,12 +350,14 @@ export default function MCPPage() {
             <Button
               type="button"
               variant={form.transport === "http" ? "default" : "outline"}
+              disabled={tagged}
               onClick={() => setF({ transport: "http" })}
             >
               {swt("interface.m1457")}</Button>
             <Button
               type="button"
               variant={form.transport === "sse" ? "default" : "outline"}
+              disabled={tagged}
               onClick={() => setF({ transport: "sse" })}
             >
               {swt("interface.m1458")}</Button>
@@ -290,6 +394,23 @@ export default function MCPPage() {
                 onChange={(e) => setF({ args: e.target.value })}
               />
             </div>
+            {tagged && (
+              <div className="grid gap-2">
+                <Label htmlFor="m-source-revision">{swt("interface.mcpSourceRevision")}</Label>
+                <Input
+                  id="m-source-revision"
+                  className="font-mono"
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-describedby="m-source-revision-hint"
+                  value={form.sourceRevision}
+                  onChange={(e) => setF({ sourceRevision: e.target.value })}
+                />
+                <p id="m-source-revision-hint" className="text-muted-foreground text-xs">
+                  {swt("interface.mcpSourceRevisionHint")}
+                </p>
+              </div>
+            )}
           </>
         ) : (
           <div className="grid gap-2">
@@ -359,12 +480,135 @@ export default function MCPPage() {
     );
   }
 
+  function catalogRow(label: string, value: React.ReactNode) {
+    return (
+      <div className="grid gap-0.5">
+        <span className="text-muted-foreground text-xs">{label}</span>
+        <span className="text-sm">{value}</span>
+      </div>
+    );
+  }
+
+  function renderCatalog(status: MCPCatalogStatus) {
+    const names = status.cache ? status.cache.tools : [];
+
+    return (
+      <div className="flex flex-col gap-4 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-muted-foreground text-xs">{swt("interface.mcpCatalogRefreshHint")}</p>
+          <Button size="sm" variant="outline" disabled={refreshing} onClick={refreshTools}>
+            <RefreshCwIcon className={refreshing ? "animate-spin" : ""} /> {swt("interface.m0225")}</Button>
+        </div>
+        <div className="grid gap-3 rounded-lg border p-3" data-testid="mcp-catalog-status" data-status={status.status}>
+          {catalogRow(
+            swt("interface.mcpCatalogStatusLabel"),
+            <Badge variant={status.status === "unavailable" ? "destructive" : "outline"}>
+              {swt(catalogStatusKeys[status.status])}
+            </Badge>,
+          )}
+          {catalogRow(swt("interface.mcpCatalogProvenance"), swt("interface.mcpCatalogProvenanceUnverified"))}
+          {catalogRow(
+            swt("interface.mcpCatalogExpectedRevision"),
+            <code className="break-all font-mono text-xs">
+              {status.expected_source_revision || swt("interface.mcpCatalogNotSet")}
+            </code>,
+          )}
+          {catalogRow(
+            swt("interface.mcpCatalogObservedRevision"),
+            <code className="break-all font-mono text-xs">
+              {status.cache?.observed_revision || swt("interface.mcpCatalogNotReported")}
+            </code>,
+          )}
+          {catalogRow(
+            swt("interface.mcpCatalogExecutableDigest"),
+            <code className="break-all font-mono text-xs">
+              {status.cache?.executable_sha256 || swt("interface.mcpCatalogNotMeasured")}
+            </code>,
+          )}
+          {catalogRow(
+            swt("interface.mcpCatalogDiscoveredAt"),
+            status.cache ? fmt.dateTime(status.cache.discovered_at) : swt("interface.mcpCatalogNever"),
+          )}
+        </div>
+        <div className="grid gap-2">
+          <span className="font-medium text-sm">{swt("interface.mcpCatalogCachedNamesTitle")}</span>
+          <p className="text-muted-foreground text-xs">{swt("interface.mcpCatalogNotCallable")}</p>
+          {names.length === 0 ? (
+            <p className="text-muted-foreground text-sm">{swt("interface.mcpCatalogEmpty")}</p>
+          ) : (
+            <div className="flex flex-wrap gap-2" data-testid="mcp-catalog-names">
+              {names.map((t) => (
+                <Badge key={t.name} variant="secondary" className="font-mono">
+                  {t.name}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderCardSummary(s: MCPServer) {
+    if (!s.catalog) {
+      return (
+        <p className="text-muted-foreground text-sm">
+          {s.tools && s.tools.length > 0 ? swt("interface.m1468", { p0: s.tools.length }) : swt("interface.m1469")}
+        </p>
+      );
+    }
+
+    return (
+      <div className="grid gap-1" data-catalog-status={s.catalog.status}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm">
+            {swt("interface.mcpCatalogCardStatus", { status: swt(catalogStatusKeys[s.catalog.status]) })}
+          </span>
+          <Badge variant="secondary">{swt("interface.mcpCatalogOnly")}</Badge>
+        </div>
+        <span className="text-muted-foreground text-xs">{swt("interface.mcpCatalogEnabledMeaning")}</span>
+      </div>
+    );
+  }
+
+  function toolsTabLabel() {
+    if (current?.catalog) return swt("interface.mcpCatalogTab");
+
+    return `${swt("interface.m1474")} ${tools.length ? `（${tools.length}）` : ""}`;
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-4 md:gap-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">MCP</h1>
         <p className="text-muted-foreground text-sm">{swt("interface.m1466")}</p>
       </div>
+
+      <Card className="gap-3">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheckIcon className="size-4" />
+            {swt("interface.mcpSecurityReportsTitle")}
+          </CardTitle>
+          <CardDescription id="security-reports-description">
+            {swt("interface.mcpSecurityReportsDescription")}
+            <br />
+            {swt("interface.mcpSecurityReportsBoundary")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-4">
+          <Label htmlFor="security-reports-enabled" className="font-normal text-muted-foreground text-sm">
+            {reportsEnabled ? swt("interface.mcpSecurityReportsOn") : swt("interface.mcpSecurityReportsOff")}
+          </Label>
+          <Switch
+            id="security-reports-enabled"
+            aria-describedby="security-reports-description"
+            checked={reportsEnabled === true}
+            disabled={reportsEnabled === null || savingReports}
+            onCheckedChange={toggleReports}
+          />
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <button
@@ -379,6 +623,7 @@ export default function MCPPage() {
         {servers.map((s) => (
           <Card
             key={s.id}
+            data-provider-kind={s.provider_kind || undefined}
             onClick={() => openEdit(s)}
             className="hover:border-primary/60 cursor-pointer gap-3 transition hover:shadow-sm"
           >
@@ -407,9 +652,7 @@ export default function MCPPage() {
               </div>
             </CardHeader>
             <CardContent className="grid gap-3">
-              <p className="text-muted-foreground text-sm">
-                {s.tools && s.tools.length > 0 ? swt("interface.m1468", { p0: s.tools.length }) : swt("interface.m1469")}
-              </p>
+              {renderCardSummary(s)}
               <div className="grid gap-2" onClick={(e) => e.stopPropagation()}>
                 <span className="text-muted-foreground text-xs">{swt("interface.m1470")}</span>
                 <div className="flex flex-wrap gap-x-4 gap-y-2">
@@ -448,27 +691,27 @@ export default function MCPPage() {
             >
               <TabsList>
                 <TabsTrigger value="config">{swt("interface.m1473")}</TabsTrigger>
-                <TabsTrigger value="tools">
-                  {swt("interface.m1474")}{" "}{tools.length ? `（${tools.length}）` : ""}
-                </TabsTrigger>
+                <TabsTrigger value="tools">{toolsTabLabel()}</TabsTrigger>
               </TabsList>
               <TabsContent value="config" className="min-h-0 flex-1 overflow-y-auto">
                 {renderForm()}
-                <div className="flex gap-2 pt-2 pb-6">
-                  <Button onClick={saveForm} disabled={saving}>
+                <div className="flex flex-col items-start gap-2 pt-2 pb-6">
+                  <Button data-testid="mcp-save" onClick={saveForm} disabled={saving}>
                     {swt("interface.m0273")}</Button>
+                  {tagged && <p className="text-muted-foreground text-xs">{swt("interface.mcpCatalogSaveNote")}</p>}
                 </div>
               </TabsContent>
               <TabsContent value="tools" className="min-h-0 flex-1 overflow-y-auto">
-                {renderTools()}
+                {current?.catalog ? renderCatalog(current.catalog) : renderTools()}
               </TabsContent>
             </Tabs>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4">
               {renderForm()}
-              <div className="pt-2 pb-6">
-                <Button onClick={saveForm} disabled={saving}>
+              <div className="flex flex-col items-start gap-2 pt-2 pb-6">
+                <Button data-testid="mcp-save" onClick={saveForm} disabled={saving}>
                   <PlusIcon /> {swt("interface.m0611")}</Button>
+                {tagged && <p className="text-muted-foreground text-xs">{swt("interface.mcpCatalogSaveNote")}</p>}
               </div>
             </div>
           )}
