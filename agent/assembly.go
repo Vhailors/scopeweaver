@@ -25,6 +25,7 @@ type DeferredInfo struct {
 	UnlockSkill        func(skillName string)
 	CatalogNativeNames []string // exact known catalog-native names, never executable capabilities
 	CatalogUse         func(context.Context, string, string, string, string) error
+	CatalogTagged      func(context.Context, string) (bool, error)
 	CatalogUseIDs      func(context.Context, string) (map[string]map[string]bool, error)
 	Callable           func(string) bool
 }

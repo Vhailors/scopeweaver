@@ -167,7 +167,7 @@ func wireAgentAugment(pg *db.DB, skillDir string, hostTools func(context.Context
 			GlobalNames:   globalNames,
 			Unlock:        unlock,
 			UnlockSkill:   unlockSkill,
-			CatalogUse:    pg.RecordCatalogNativeUse,
+			CatalogTagged: pg.CatalogTaggedName,
 			CatalogUseIDs: pg.CatalogNativeUseIDs,
 		}
 		if pg.SecurityReportsEnabled() {

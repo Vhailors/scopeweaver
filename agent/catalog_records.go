@@ -1,73 +1,24 @@
 package agent
 
 import (
-	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/Autumn-27/norma/llm"
 	"github.com/Autumn-27/norma/transcript"
 )
 
-// A fresh SDK writer starts a new UUID root even when it appends to an existing
-// file (the planner). A resumed writer continues the captured baseline instead.
-func (p *nativeHistoryProvider) scopedRecords(ctx context.Context) ([]transcript.Record, error) {
-	if p.scopeSession != "" && p.scopeSession != p.sessionID(ctx) {
-		return nil, fmt.Errorf("catalog history: session identity changed")
-	}
-	if p.initialErr != nil {
-		return nil, fmt.Errorf("catalog history baseline: %w", p.initialErr)
-	}
-	records, err := p.records(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if p.store == nil {
-		return records, nil
-	}
-	n := len(p.initial)
-	if len(records) <= n || n > 0 && records[n-1].UUID != p.initial[n-1].UUID {
-		return nil, fmt.Errorf("catalog history: missing or changed session append")
-	}
-	added := records[n:]
-	parent := transcript.LastUUID(p.initial)
-	fresh := added[0].ParentUUID == ""
-	if fresh {
-		parent = ""
-	}
-	for _, rec := range added {
-		if rec.UUID == "" || rec.ParentUUID != parent {
-			return nil, fmt.Errorf("catalog history: displaced session occurrence %q", rec.UUID)
-		}
-		parent = rec.UUID
-	}
-	if fresh {
-		return added, nil
-	}
-	// Mirror agentcore.cleanResumed, but only in the pre-session baseline.
-	// ResumeWriter still chains through omitted records; their UUIDs are retained
-	// in the raw file and new births keep their actual predecessor anchors.
-	base := p.initial
-	for len(base) > 0 {
-		last := base[len(base)-1]
-		if last.Message == nil || last.Message.Role != llm.RoleAssistant || len(last.Message.ToolUses()) == 0 {
-			break
-		}
-		base = base[:len(base)-1]
-	}
-	if _, err := catalogRecordMarks(base, nil); err != nil {
-		return nil, err // later appends cannot fill a truncated old boundary
-	}
-	return append(append([]transcript.Record(nil), base...), added...), nil
-}
-
+// Bounded legacy adapter only. New births do not create exclusion marks.
 func catalogRecordMarks(records []transcript.Record, ids map[string]map[string]bool) (map[string]map[string]bool, error) {
 	marks := map[string]map[string]bool{}
 	var working []transcript.Record
 	legacy := map[string]bool{}
+	results := map[string]bool{}
 	for i, rec := range records {
 		if rec.ParentUUID == "" {
 			working = nil // never summarize records from a previous fresh writer
+			results = map[string]bool{}
 		}
 		if rec.Type == "boundary" {
 			if rec.Boundary == nil || rec.Boundary.MessagesSummarized < 0 || rec.Boundary.MessagesSummarized > len(working) {
@@ -104,12 +55,13 @@ func catalogRecordMarks(records []transcript.Record, ids map[string]map[string]b
 				marks[copy.UUID] = marks[source.UUID]
 			}
 			working = nil
+			results = map[string]bool{}
 		}
 		if rec.Message == nil {
 			continue
 		}
 		if _, copied := marks[rec.UUID]; !copied {
-			marks[rec.UUID] = ids[rec.ParentUUID]
+			marks[rec.UUID] = maps.Clone(ids[rec.ParentUUID])
 			for _, use := range rec.Message.ToolUses() {
 				if ids[""][use.ID] && !legacy[use.ID] {
 					if marks[rec.UUID] == nil {
@@ -118,6 +70,40 @@ func catalogRecordMarks(records []transcript.Record, ids map[string]map[string]b
 					marks[rec.UUID][use.ID] = true
 					legacy[use.ID] = true
 				}
+			}
+		}
+		// Associate a result at its source occurrence, before a boundary cut or
+		// later ID reuse can separate it from its preceding use. Copies inherit
+		// that exact record's mark rather than re-pairing the active suffix.
+		for _, block := range rec.Message.Content {
+			switch block.Type {
+			case llm.BlockToolUse:
+				results[block.ID] = marks[rec.UUID][block.ID]
+			case llm.BlockToolResult:
+				if results[block.ToolUseID] && !marks[rec.UUID][block.ToolUseID] {
+					marks[rec.UUID] = maps.Clone(marks[rec.UUID])
+					if marks[rec.UUID] == nil {
+						marks[rec.UUID] = map[string]bool{}
+					}
+					marks[rec.UUID][block.ToolUseID] = true
+				}
+			}
+		}
+		// A scoped ID cannot distinguish multiple births or results in one
+		// occurrence. Resolve all marks before any destructive projection.
+		uses, outputs := map[string]bool{}, map[string]bool{}
+		for _, block := range rec.Message.Content {
+			switch block.Type {
+			case llm.BlockToolUse:
+				if marks[rec.UUID][block.ID] && uses[block.ID] {
+					return nil, fmt.Errorf("catalog history: ambiguous marked use %q at record %d", block.ID, i)
+				}
+				uses[block.ID] = true
+			case llm.BlockToolResult:
+				if marks[rec.UUID][block.ToolUseID] && outputs[block.ToolUseID] {
+					return nil, fmt.Errorf("catalog history: ambiguous marked result %q at record %d", block.ToolUseID, i)
+				}
+				outputs[block.ToolUseID] = true
 			}
 		}
 		if llm.IsBoundaryMarker(*rec.Message) {

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Autumn-27/artex/agent"
+	"github.com/Autumn-27/artex/db"
 	"github.com/Autumn-27/artex/locale"
 	"github.com/Autumn-27/norma/llm"
 	"github.com/Autumn-27/norma/transcript"
@@ -104,6 +105,25 @@ func catalogPrompt(t *testing.T, chat *agent.ChatAgent, session string) {
 	}
 }
 
+func catalogBlockedPrompt(t *testing.T, chat *agent.ChatAgent, session string) {
+	t.Helper()
+	results := 0
+	_, err := chat.Chat(t.Context(), "auto", session, "Continue", 4, time.Minute, false, func(a db.Activity) {
+		if a.Kind == "tool_use" || a.Kind == "tool_result" {
+			t.Error("blocked response reached tool dispatch")
+		}
+		if a.Kind == "result" {
+			results++
+			if !a.IsError || !strings.Contains(a.Detail, "`hook_stopped`") {
+				t.Errorf("wrong host terminal classification: %+v", a)
+			}
+		}
+	})
+	if err == nil || results != 1 {
+		t.Fatalf("blocked response err=%v results=%d", err, results)
+	}
+}
+
 func catalogPair(t *testing.T, req llm.CompletionRequest, name, id string, want int) string {
 	t.Helper()
 	uses, results := 0, 0
@@ -152,18 +172,17 @@ func TestSecurityCatalogRenameResume(t *testing.T) {
 				}
 				native := "mcp__" + f.m.Name + "__unexpected_operation"
 				p.emit = &llm.ContentBlock{Type: llm.BlockToolUse, ID: "native", Name: native, Input: json.RawMessage(`{}`)}
-				catalogPrompt(t, chat, session)
+				catalogBlockedPrompt(t, chat, session)
 				catalogPair(t, p.requests[len(p.requests)-1], native, "native", 0)
 				records, err := store.Load(store.MainPath(session))
 				if err != nil {
 					t.Fatal(err)
 				}
 				born, _ := transcript.Messages(records)
-				catalogPair(t, llm.CompletionRequest{Messages: born}, native, "native", 1)
-				var providerID int64
-				var kind string
-				if err := f.s.m.pg.QueryRow(`SELECT provider_id,provider_kind FROM mcp_catalog_native_uses WHERE session_id=$1 AND tool_use_id='native'`, session).Scan(&providerID, &kind); err != nil || providerID != f.m.ID || kind != "yeepforge" {
-					t.Fatalf("birth identity %d/%s: %v", providerID, kind, err)
+				catalogPair(t, llm.CompletionRequest{Messages: born}, native, "native", 0)
+				var marks int
+				if err := f.s.m.pg.QueryRow(`SELECT count(*) FROM mcp_catalog_native_uses WHERE session_id=$1`, session).Scan(&marks); err != nil || marks != 0 {
+					t.Fatalf("suppressed birth created marks=%d: %v", marks, err)
 				}
 				if birth == "before" {
 					f.m.Name += "Renamed"
@@ -206,7 +225,7 @@ func TestSecurityCatalogRenameResume(t *testing.T) {
 				catalogPrompt(t, chat, session)
 				catalogPair(t, p.requests[len(p.requests)-1], native, "native", 0)
 				// Then every subsequent resumed pair stays excluded independent of names/cache.
-				t.Logf("birth=%s mutation=%s: durable row=%d; native pair=0/0 throughout", birth, mutation, providerID)
+				t.Logf("birth=%s mutation=%s: no new mark; native pair=0/0 throughout", birth, mutation)
 			})
 		}
 	}
@@ -226,7 +245,7 @@ func TestSecurityCatalogGenericLabelReuse(t *testing.T) {
 			chat, p, _, session := catalogConversation(t, f, []int64{f.m.ID})
 			old := "mcp__" + departed + "__unexpected_operation"
 			p.emit = &llm.ContentBlock{Type: llm.BlockToolUse, ID: "tagged", Name: old, Input: json.RawMessage(`{}`)}
-			catalogPrompt(t, chat, session)
+			catalogBlockedPrompt(t, chat, session)
 			catalogPair(t, p.requests[len(p.requests)-1], old, "tagged", 0)
 			f.m.Name += "Renamed"
 			f.save(t)

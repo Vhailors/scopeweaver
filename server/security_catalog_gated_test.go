@@ -29,7 +29,7 @@ func TestSecurityCatalogRegisteredDeferred(t *testing.T) {
 				label := f.m.Name
 				name := "mcp__" + label + "__unexpected_operation"
 				emitCatalogUse(p, "call_0", name)
-				catalogPrompt(t, chat, session)
+				catalogBlockedPrompt(t, chat, session)
 				catalogPair(t, p.requests[len(p.requests)-1], name, "call_0", 0)
 				f.m.Name += "Away"
 				f.save(t)
@@ -108,8 +108,8 @@ func TestSecurityCatalogRegisteredDeferred(t *testing.T) {
 					catalogPair(t, p.requests[len(p.requests)-1], name, "parallel", 1)
 				}
 				var count int
-				if err := f.s.m.pg.QueryRow(`SELECT count(*) FROM mcp_catalog_native_uses WHERE session_id=$1`, session).Scan(&count); err != nil || count != 1 {
-					t.Fatalf("marks=%d want only the original native birth: %v", count, err)
+				if err := f.s.m.pg.QueryRow(`SELECT count(*) FROM mcp_catalog_native_uses WHERE session_id=$1`, session).Scan(&count); err != nil || count != 0 {
+					t.Fatalf("marks=%d want no new native birth: %v", count, err)
 				}
 				t.Logf("B9: gated=%t actual tools/call=%d followup=1/1 cold=1/1 tagged occurrence=0/0", gated, calls-before)
 			})

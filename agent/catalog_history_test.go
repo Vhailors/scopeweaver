@@ -74,8 +74,8 @@ func TestDeferredCatalogAppendFailureClosed(t *testing.T) {
 	}
 	// When the SDK cannot append the current user record.
 	_, _, err := captureRun(t.Context(), opts, "fixture", nil)
-	// Then no unfiltered or position-guessed request reaches the model.
-	if err == nil || len(probe.requests) != 0 {
+	// Then a no-mark live turn keeps SDK append-error recovery semantics.
+	if err != nil || len(probe.requests) != 1 {
 		t.Fatalf("append mismatch err=%v forwarded=%d", err, len(probe.requests))
 	}
 }
@@ -107,7 +107,7 @@ func TestDeferredCatalogResumedCleanupAndSettlement(t *testing.T) {
 	}
 	options := func() agentcore.Options {
 		opts := agentcore.Options{
-			Provider: deferredProvider(p, DeferredInfo{CatalogUse: d.RecordCatalogNativeUse, CatalogUseIDs: d.CatalogNativeUseIDs,
+			Provider: deferredProvider(p, DeferredInfo{CatalogTagged: d.CatalogTaggedName, CatalogUseIDs: d.CatalogNativeUseIDs,
 				Callable: func(name string) bool { return name == "LS" }}, store),
 			Transcript: store, SessionID: session, Tools: actool.DefaultTools(),
 			WorkingDir: dir, PermissionMode: permission.ModeBypass, NonStreaming: true,
@@ -116,13 +116,17 @@ func TestDeferredCatalogResumedCleanupAndSettlement(t *testing.T) {
 		enableNoa(&opts, nil, dir, session, nil)
 		return opts
 	}
-	first := agentcore.NewSession(options())
+	firstOpts := options()
+	first := agentcore.NewSession(firstOpts)
 	for event, err := range first.Prompt(t.Context(), "fixture") {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if event.Kind == harness.KindToolUse {
-			break // emulate interruption after the real assistant birth was persisted
+		if event.Kind == harness.KindResult {
+			if event.Terminal == nil || event.Terminal.Err == nil {
+				t.Fatal("all-blocked response was reported as success")
+			}
+			break
 		}
 	}
 	if err := first.Close(); err != nil {
@@ -130,11 +134,10 @@ func TestDeferredCatalogResumedCleanupAndSettlement(t *testing.T) {
 	}
 	// When a cold resumed Session drops that trailing pending use and executes
 	// the same ID through LS, then runs another prompt/settlement on itself.
-	second := agentcore.NewSession(options())
+	secondOpts := options()
+	second := agentcore.NewSession(secondOpts)
 	defer second.Close()
-	if err := second.Resume(session); err != nil {
-		t.Fatal(err)
-	}
+	resumeCatalogSession(t.Context(), second, secondOpts)
 	for range 2 {
 		p.replies = [][]llm.ContentBlock{{{Type: llm.BlockToolUse, ID: "call_0", Name: "LS", Input: json.RawMessage(`{}`)}}}
 		if _, _, err := captureRunSession(t.Context(), second, "continue", nil); err != nil {

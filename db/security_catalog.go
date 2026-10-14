@@ -106,6 +106,17 @@ observed_revision=EXCLUDED.observed_revision,tools=EXCLUDED.tools`,
 	return tx.Commit()
 }
 
+// CatalogTaggedName uses current and historical labels, including never-refreshed
+// providers. It records nothing; the host gives registered tools precedence.
+func (d *DB) CatalogTaggedName(ctx context.Context, name string) (bool, error) {
+	var tagged bool
+	err := d.QueryRowContext(ctx, `SELECT EXISTS (
+SELECT 1 FROM mcp_servers m JOIN mcp_catalog_labels l ON l.server_id=m.id
+WHERE m.provider_kind<>'' AND left($1,length('mcp__'||l.label||'__'))='mcp__'||l.label||'__'
+)`, name).Scan(&tagged)
+	return tagged, err
+}
+
 // RecordCatalogNativeUse classifies a newly emitted use against the row set
 // visible in this statement. A later cache/label change never reclassifies it.
 func (d *DB) RecordCatalogNativeUse(ctx context.Context, session, messageID, useID, name string) error {
