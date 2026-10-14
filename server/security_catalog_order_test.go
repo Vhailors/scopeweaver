@@ -46,7 +46,7 @@ func TestSecurityCatalogEmissionOrder(t *testing.T) {
 				name := "mcp__" + old + "__unexpected_operation"
 				// When an unknown/non-callable emission uses a tagged prefix.
 				emitCatalogUse(p, "call_0", name)
-				catalogPrompt(t, chat, session)
+				catalogBlockedPrompt(t, chat, session)
 				catalogPair(t, p.requests[len(p.requests)-1], name, "call_0", 0)
 				unknown := "mcp__unconfigured_unknown__operation"
 				emitCatalogUse(p, "unknown", unknown)
@@ -108,7 +108,7 @@ func TestSecurityCatalogEmissionOrder(t *testing.T) {
 					catalogPair(t, p.requests[len(p.requests)-1], unknown, "unknown", 1)
 				}
 				var marked int
-				if err := f.s.m.pg.QueryRow(`SELECT count(*) FROM mcp_catalog_native_uses WHERE session_id=$1 AND tool_use_id='call_0' AND message_id<>''`, session).Scan(&marked); err != nil || marked != 1 {
+				if err := f.s.m.pg.QueryRow(`SELECT count(*) FROM mcp_catalog_native_uses WHERE session_id=$1 AND tool_use_id='call_0' AND message_id<>''`, session).Scan(&marked); err != nil || marked != 0 {
 					t.Fatalf("position marks=%d: %v", marked, err)
 				}
 				t.Logf("%s delete=%t: tagged 0/0; duplicate-id generic 1/1 in every later request", order, deleted)
@@ -130,7 +130,7 @@ func TestSecurityCatalogCallableAmbiguousPrefix(t *testing.T) {
 	chat, p, _, session := catalogConversation(t, f, []int64{f.m.ID})
 	blocked := "mcp__" + f.m.Name + "__not_callable"
 	emitCatalogUse(p, "native", blocked)
-	catalogPrompt(t, chat, session)
+	catalogBlockedPrompt(t, chat, session)
 	catalogPair(t, p.requests[len(p.requests)-1], blocked, "native", 0)
 	generic := *f.m
 	generic.ID, generic.Name, generic.ProviderKind = 0, base, ""

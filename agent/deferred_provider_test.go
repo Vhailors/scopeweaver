@@ -7,6 +7,7 @@ import (
 	"iter"
 	"testing"
 
+	"github.com/Autumn-27/norma/agentcore"
 	"github.com/Autumn-27/norma/llm"
 	"github.com/Autumn-27/norma/transcript"
 )
@@ -84,6 +85,13 @@ func TestDeferredProviderFiltersMaterializedHistory(t *testing.T) {
 			return map[string]map[string]bool{parent: {"old": true}}, nil
 		},
 	}, store)
+	original := source
+	opts := agentcore.Options{Provider: provider, Transcript: store, SessionID: "history"}
+	configureCatalogHistory(&opts)
+	s := agentcore.NewSession(opts)
+	defer s.Close()
+	resumeCatalogSession(ctx, s, opts)
+	source.Messages = llm.MessagesForAPI(s.Messages())
 	// When both non-streaming and streaming calls cross the shared last boundary.
 	if _, _, _, err := provider.Complete(ctx, source); err != nil {
 		t.Fatal(err)
@@ -101,14 +109,14 @@ func TestDeferredProviderFiltersMaterializedHistory(t *testing.T) {
 	for _, req := range probe.requests {
 		raw, err := json.Marshal(req)
 		if err != nil || len(req.Tools) != 1 || req.Tools[0].Name != "mcp__generic server__allowed" ||
-			len(req.Messages) != 1 || len(req.Messages[0].Content) != 2 ||
-			req.Messages[0].Content[0].Signature != "signed" ||
-			req.Messages[0].Content[1].Signature != "preserved" ||
+			len(req.Messages) != 2 || len(req.Messages[1].Content) != 2 ||
+			req.Messages[1].Content[0].Signature != "signed" ||
+			req.Messages[1].Content[1].Signature != "preserved" ||
 			req.System[0] != source.System[0] {
 			t.Fatalf("structural filter changed content or retained a native capability: %s %v", raw, err)
 		}
 	}
-	after, err := json.Marshal(source)
+	after, err := json.Marshal(original)
 	if err != nil || string(before) != string(after) {
 		t.Fatalf("provider filter mutated original history: %s %v", after, err)
 	}

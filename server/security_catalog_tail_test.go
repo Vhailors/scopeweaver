@@ -49,7 +49,7 @@ func TestSecurityCatalogEditedTail(t *testing.T) {
 					t.Fatal(err)
 				}
 				raw, _ := transcript.Messages(records)
-				catalogPair(t, llm.CompletionRequest{Messages: raw}, native, "native", 1)
+				catalogPair(t, llm.CompletionRequest{Messages: raw}, native, "native", 0)
 				writer := store.ResumeWriter(session, transcript.LastUUID(records))
 				writer.RecordMessage(llm.UserText(strings.Repeat("padding ", 50000)), llm.Usage{})
 				if err := writer.Err(); err != nil {

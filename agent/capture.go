@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"github.com/Autumn-27/artex/locale"
 	"strings"
 	"time"
@@ -81,6 +82,10 @@ func captureRunSession(ctx context.Context, s *agentcore.Session, input string, 
 	for ev, err := range s.Prompt(ctx, input) {
 		if err != nil {
 			flush()
+			var policy *catalogPolicyError
+			if errors.As(err, &policy) {
+				reason = harness.ReasonHookStopped
+			}
 			if ctx.Err() != nil { // engine/user cancellation, not a provider failure
 				sum, detail := terminalText(ctx, &harness.Terminal{Reason: reason, Err: ctx.Err()}, lastTool)
 				rec(activityWithUsage(db.Activity{Kind: "result", Summary: firstLine(sum, 400), Detail: detail}, lastUsage))
@@ -129,6 +134,13 @@ func captureRunSession(ctx context.Context, s *agentcore.Session, input string, 
 			}
 		case harness.KindResult:
 			if ev.Terminal != nil {
+				var policy *catalogPolicyError
+				if errors.As(ev.Terminal.Err, &policy) {
+					term := *ev.Terminal
+					term.Reason = harness.ReasonHookStopped
+					term.Usage.Add(policy.usage)
+					ev.Terminal = &term
+				}
 				if ev.Terminal.Reason != harness.ReasonAbortedStreaming {
 					sidequestion.Finish(ctx, ev.Terminal.Messages)
 				}

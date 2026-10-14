@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Autumn-27/norma/agentcore"
 	"github.com/Autumn-27/norma/llm"
 	actool "github.com/Autumn-27/norma/tool"
 )
@@ -93,7 +94,12 @@ func TestSeedUnlockCatalogHistory(t *testing.T) {
 	filter := &nativeHistoryProvider{store: store, load: func(context.Context, string) (map[string]map[string]bool, error) {
 		return map[string]map[string]bool{parent: {"native": true}}, nil
 	}}
-	request, err := filter.request(ctx, llm.CompletionRequest{Messages: msgs})
+	opts := agentcore.Options{Provider: filter, Transcript: store, SessionID: "history"}
+	configureCatalogHistory(&opts)
+	s := agentcore.NewSession(opts)
+	defer s.Close()
+	resumeCatalogSession(ctx, s, opts)
+	request, err := filter.request(ctx, llm.CompletionRequest{Messages: llm.MessagesForAPI(s.Messages())})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"os"
@@ -104,7 +105,7 @@ func TestDeferredPlannerWakes(t *testing.T) {
 			defer func() { ToolAugment, ToolResolve = augment, resolve }()
 			ToolResolve = nil
 			ToolAugment = func(context.Context, string) ([]actool.CoreTool, DeferredInfo, func()) {
-				return nil, DeferredInfo{CatalogUse: d.RecordCatalogNativeUse, CatalogUseIDs: d.CatalogNativeUseIDs}, func() {}
+				return nil, DeferredInfo{CatalogTagged: d.CatalogTaggedName, CatalogUseIDs: d.CatalogNativeUseIDs}, func() {}
 			}
 			dir := t.TempDir()
 			markerDir := filepath.Join(dir, "tasks", fmt.Sprint(task.ID))
@@ -171,7 +172,13 @@ func TestDeferredPlannerWakes(t *testing.T) {
 					provider.replies = [][]llm.ContentBlock{{use("LS", "call_0"), use(name, "call_7")}}
 				}
 				before := len(provider.requests)
-				if _, _, err := planner.Plan(t.Context(), task.ID, d.Assets(), d.Exploration(task.ExplorationID), task.Goal, nil, nil); err != nil {
+				_, _, err := planner.Plan(t.Context(), task.ID, d.Assets(), d.Exploration(task.ExplorationID), task.Goal, nil, nil)
+				var policy *catalogPolicyError
+				if scenario.tagged && (wake == 1 || wake == 3) {
+					if !errors.As(err, &policy) || len(provider.requests)-before != 1 {
+						t.Fatalf("wake %d blocked err=%v requests=%d", wake, err, len(provider.requests)-before)
+					}
+				} else if err != nil {
 					t.Fatalf("wake %d failed: %v", wake, err)
 				}
 				req := provider.requests[len(provider.requests)-1]

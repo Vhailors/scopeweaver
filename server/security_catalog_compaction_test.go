@@ -42,7 +42,7 @@ func TestSecurityCatalogCompactionResume(t *testing.T) {
 	catalogPrompt(t, chat, session)
 	native := "mcp__" + f.m.Name + "__unexpected_operation"
 	p.emit = &llm.ContentBlock{Type: llm.BlockToolUse, ID: "native", Name: native, Input: json.RawMessage(`{}`)}
-	catalogPrompt(t, chat, session)
+	catalogBlockedPrompt(t, chat, session)
 	catalogPair(t, p.requests[len(p.requests)-1], native, "native", 0)
 	original, err := store.Load(store.MainPath(session))
 	if err != nil {

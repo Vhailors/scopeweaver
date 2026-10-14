@@ -116,11 +116,17 @@ func TestSecurityCatalogPassiveBoundaries(t *testing.T) {
 	}
 	store := transcript.NewStore(filepath.Join(f.s.skillDir, "transcripts"))
 	writer := store.NewWriter("task3-resume", "")
+	writer.RecordMessage(llm.UserText("catalog fixture history start"), llm.Usage{})
+	records, err := store.Load(store.MainPath("task3-resume"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := transcript.LastUUID(records)
 	writer.RecordMessage(llm.Message{Role: llm.RoleAssistant, Content: []llm.ContentBlock{
 		{Type: llm.BlockToolUse, ID: "prior-skill", Name: "Skill", Input: json.RawMessage(`{"name":"catalog-probe"}`)},
 		{Type: llm.BlockToolUse, ID: "prior-native", Name: native, Input: json.RawMessage(`{}`)},
 	}}, llm.Usage{})
-	if err := f.s.m.pg.RecordCatalogNativeUse(t.Context(), "task3-resume", "", "prior-native", native); err != nil {
+	if err := f.s.m.pg.RecordCatalogNativeUse(t.Context(), "task3-resume", parent, "prior-native", native); err != nil {
 		t.Fatal(err)
 	}
 	writer.RecordMessage(llm.Message{Role: llm.RoleUser, Content: []llm.ContentBlock{
