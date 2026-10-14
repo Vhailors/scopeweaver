@@ -61,7 +61,7 @@ const run = {
   startedAt: new Date().toISOString(), scenario, root, evidence,
   authorRoute: { model: process.env.PI_MODEL ?? "unreported", provider: process.env.PI_PROVIDER ?? "unreported", tier: "standard/default" },
   runtimeRoute: { provider: "local-scripted-anthropic", model: "task11-scripted", realModelCalls: 0 },
-  results: [], commands: [], processes: [], knownOpen: ["Task 3 B11: damaged transcript resume is not waived"],
+  results: [], commands: [], processes: [], knownOpen: [],
 };
 
 const cleanup = { errors: [], processes: [], ports: [], containerRemoved: false, volumeRemoved: false, databaseDropped: false, detachedWorktreeRemoved: false };
