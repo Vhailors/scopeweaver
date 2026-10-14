@@ -42,3 +42,39 @@ func visibleReportSkills(reg *skill.Registry) []string {
 	}
 	return names
 }
+
+type catalogLiveServer struct {
+	Server   string `json:"server"`
+	Skill    string `json:"skill"`
+	Enabled  bool   `json:"enabled"`
+	Callable bool   `json:"callable"`
+	Tools    int    `json:"tools"`
+}
+
+// visibleLiveServers reports generic (non-catalog) MCP servers named by a visible
+// skill's mcps field. Unlike catalog providers (Callable always false), these are
+// callable by the agent once that skill is loaded, which is what unlocks them.
+func visibleLiveServers(reg *skill.Registry, providers []*db.MCPServer, visible map[int64]bool) []catalogLiveServer {
+	if reg == nil {
+		return nil
+	}
+	var out []catalogLiveServer
+	seen := map[string]bool{}
+	for _, sk := range reg.List() {
+		for _, name := range sk.MCPs {
+			if name == "" || seen[sk.Name+"\x00"+name] {
+				continue
+			}
+			seen[sk.Name+"\x00"+name] = true
+			for _, m := range providers {
+				if m.Name == name && m.ProviderKind == "" && visible[m.ID] {
+					out = append(out, catalogLiveServer{
+						Server: m.Name, Skill: sk.Name, Enabled: m.Enabled,
+						Callable: true, Tools: len(m.Tools),
+					})
+				}
+			}
+		}
+	}
+	return out
+}

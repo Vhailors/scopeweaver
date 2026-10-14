@@ -133,7 +133,11 @@ func (s *Server) toolSecurityCatalog(agentKey string, langs ...locale.Lang) acto
 			if !s.m.pg.SecurityReportsEnabled() {
 				return failure("disabled")
 			}
-			return jsonResult(map[string]any{"catalog": out})
+			result := map[string]any{"catalog": out}
+			if live := visibleLiveServers(reg, providers, visibleProviders); len(live) > 0 {
+				result["live_servers"] = live
+			}
+			return jsonResult(result)
 		})
 }
 
