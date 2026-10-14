@@ -2,6 +2,13 @@ package db
 
 import "database/sql"
 
+const SettingSecurityReportsEnabled = "security_reports_enabled"
+
+// SecurityReportsEnabled is opt-in; missing settings never authorize new work.
+func (d *DB) SecurityReportsEnabled() bool {
+	return d.GetBool(SettingSecurityReportsEnabled, false)
+}
+
 // Settings is a tiny key-value store for global app config the UI toggles at
 // runtime (e.g. traffic_capture). Missing keys fall back to caller defaults.
 

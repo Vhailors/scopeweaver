@@ -1,0 +1,19 @@
+{
+  "meta": { "hostname": "fixture-host.invalid", "user": "Synthetic user", "kernel": "synthetic-kernel" },
+  "duration": 0.0,
+  "findings": [
+    {
+      "check_id": "synthetic-unavailable",
+      "category": "known_cves",
+      "title": "Synthetic incomplete observation",
+      "confidence": "ERROR",
+      "description": "Synthetic check could not complete scopeweaver-secret-canary-01",
+      "evidence": {},
+      "remediation": "",
+      "references": [],
+      "cve": null,
+      "exploit_command": null
+    }
+  ],
+  "errors": { "synthetic-unavailable": "Synthetic unavailable check scopeweaver-secret-canary-01" }
+}

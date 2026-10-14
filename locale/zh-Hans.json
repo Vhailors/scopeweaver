@@ -1,4 +1,7 @@
 {
+  "Catalog-only tool operations were blocked by local host policy; no tagged tool was executed. Change the request before continuing.": "本地主机策略已阻止仅供目录使用的工具操作；未执行任何此类工具。请修改请求后再继续。",
+  "Local host policy could not safely resolve catalog history or tool authorization; execution was stopped.": "本地主机策略无法安全确认目录历史记录或工具执行权限；已停止执行。",
+  "Transcript resume failed; continuing with the SDK's fresh session.": "对话记录恢复失败；将使用 SDK 的新会话继续。",
   "Tool %s internal error: %v (this call failed; try different arguments or another tool)": "工具 %s 内部错误：%v（本次调用已失败，可换个参数或改用别的工具）",
   "User paused the task": "用户暂停了任务",
   "The user paused the task through POST /api/tasks/{id}/control with action=pause. This Planner/Worker run was cancelled; running intents return to frontier(open), and will be claimed and restarted from the beginning on resume.": "用户通过任务控制接口（POST /api/tasks/{id}/control，action=pause）暂停了任务。本次 Planner/Worker 运行被主动取消；运行中的意图会退回 frontier(open)，恢复任务后重新领取并从头执行",

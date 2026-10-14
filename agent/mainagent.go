@@ -120,7 +120,7 @@ func (m *MainAgent) Chat(ctx context.Context, taskID int64, mainSeg int, as *db.
 	ctx = intercept.WithReviewWorkingDirectory(ctx, mainDir)
 	system, boundary := deferredSystem(mainAgentSystem(goal, m.workDir, mainDir, locale.FromContext(ctx)), def)
 	opts := agentcore.Options{
-		Provider:        m.prov,
+		Provider:        deferredProvider(m.prov, def, m.tx),
 		SystemPrompt:    append(system, outputLanguageInstruction(locale.FromContext(ctx))),
 		DynamicBoundary: boundary,
 		Tools:           tools,
@@ -174,7 +174,7 @@ func (m *MainAgent) Chat(ctx context.Context, taskID int64, mainSeg int, as *db.
 	// across turns (each Chat is a fresh session; without this it can't see earlier
 	// messages). First turn: no file yet → Resume loads nothing and proceeds.
 	if m.tx != nil {
-		_ = s.Resume(opts.SessionID)
+		resumeCatalogSession(ctx, s, opts)
 	}
 	// C2: this session is fresh each turn; re-unlock skill-gated MCPs from prior
 	// Skill() calls in the reloaded history so revealed tools stay callable.

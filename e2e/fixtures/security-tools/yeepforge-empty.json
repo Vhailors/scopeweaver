@@ -1,0 +1,10 @@
+{
+  "tool": "YeepForge",
+  "version": "1.0",
+  "target": null,
+  "engagement": null,
+  "generated": "2026-10-13T12:00:00.000001",
+  "risk": { "score": "0.0", "level": "Info" },
+  "findings": [],
+  "stats": { "Critical": 0, "High": 0, "Medium": 0, "Low": 0, "Info": 0 }
+}

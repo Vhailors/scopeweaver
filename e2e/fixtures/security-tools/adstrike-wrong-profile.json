@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "generated_by": "AdStrike v5.0",
+  "generated_at": "2026-10-13T12:00:00.000001",
+  "engagement": "Synthetic wrong-profile fixture",
+  "tester": "Synthetic tester",
+  "target": { "domain": "fixture-domain.invalid", "dc_ip": "192.0.2.10" },
+  "risk": { "overall_cvss": 0.0, "overall_severity": "Info" },
+  "summary": { "Critical": 0, "High": 0, "Medium": 0, "Low": 0, "Info": 0 },
+  "commands_run": 0,
+  "owned_users": [],
+  "owned_machines": [],
+  "loot_keys": [],
+  "mitre_tactics_covered": [],
+  "findings": []
+}

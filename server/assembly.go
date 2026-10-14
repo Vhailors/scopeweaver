@@ -6,7 +6,6 @@ import (
 	"github.com/Autumn-27/artex/locale"
 	"io"
 	"log"
-	"path/filepath"
 	"strings"
 
 	"github.com/Autumn-27/artex/agent"
@@ -26,32 +25,14 @@ import (
 func wireAgentAugment(pg *db.DB, skillDir string, hostTools func(context.Context) ([]actool.CoreTool, map[string][]string)) {
 	agent.ToolAugment = func(ctx context.Context, agentKey string) ([]actool.CoreTool, agent.DeferredInfo, func()) {
 		a, err := pg.GetAgentByKey(agentKey)
-		if err != nil || a == nil {
+		if err != nil || a == nil || !a.Enabled {
 			return nil, agent.DeferredInfo{}, nil
 		}
 		var extra []actool.CoreTool
 
 		// --- skills: load visible skills into reg (used for the Skill meta-tool
 		// and to know which MCP servers are skill-gated). ---
-		var reg *skill.Registry
-		if names, _ := pg.AgentSkillNames(a.ID); len(names) > 0 {
-			nameSet := make(map[string]bool, len(names))
-			for _, n := range names {
-				nameSet[n] = true
-			}
-			if allReg, err := skill.LoadDir(skillDir); err == nil && allReg != nil {
-				reg = skill.NewRegistry()
-				for _, s := range allReg.List() {
-					// match by directory name (Base of Dir), not by skill display Name
-					if s.Dir != "" && nameSet[filepath.Base(s.Dir)] {
-						reg.Add(s)
-					}
-				}
-				if len(reg.List()) == 0 {
-					reg = nil
-				}
-			}
-		}
+		reg, _ := visibleSkillRegistry(pg, skillDir, a.ID)
 		// A server named by any visible skill's `mcps:` is skill-gated: its tools
 		// are deferred + locked (not in the global block) until that skill loads.
 		gated := map[string]bool{}
@@ -71,11 +52,22 @@ func wireAgentAugment(pg *db.DB, skillDir string, hostTools func(context.Context
 		serverTools := map[string][]string{} // server name → its tool names
 		var allNames, globalNames []string
 		globalSet := map[string]bool{}
+		catalogNames := map[string]bool{}
 		{
 			mcpIDs, _ := pg.AgentVisible(a.ID, "mcp")
 			want := idSet(mcpIDs)
 			all, _ := pg.ListMCP()
 			for _, m := range all {
+				if m.ProviderKind != "" {
+					// Cached native names identify structural history entries, not
+					// executable tools. History is classified separately at birth.
+					if m.Catalog != nil && m.Catalog.Cache != nil {
+						for _, t := range m.Catalog.Cache.Tools {
+							catalogNames["mcp__"+m.Name+"__"+t.Name] = true
+						}
+					}
+					continue // catalog metadata never grants a connection or native tools
+				}
 				if !m.Enabled {
 					continue
 				}
@@ -150,7 +142,7 @@ func wireAgentAugment(pg *db.DB, skillDir string, hostTools func(context.Context
 		// tools flagged deferred contribute their names to the deferred wiring so
 		// their schema is withheld (SearchExtraTools/ExecuteExtraTool), same as MCP.
 		if hostTools != nil {
-			ht, deferredBinds := hostTools(ctx)
+			ht, deferredBinds := hostTools(context.WithValue(ctx, catalogAgentKey{}, a.Key))
 			extra = append(extra, ht...)
 			for name, boundAgents := range deferredBinds {
 				if !contains(boundAgents, a.Key) {
@@ -171,10 +163,18 @@ func wireAgentAugment(pg *db.DB, skillDir string, hostTools func(context.Context
 			}
 		}
 		def := agent.DeferredInfo{
-			Deferred:    allNames,
-			GlobalNames: globalNames,
-			Unlock:      unlock,
-			UnlockSkill: unlockSkill,
+			Deferred:      allNames,
+			GlobalNames:   globalNames,
+			Unlock:        unlock,
+			UnlockSkill:   unlockSkill,
+			CatalogTagged: pg.CatalogTaggedName,
+			CatalogUseIDs: pg.CatalogNativeUseIDs,
+		}
+		if pg.SecurityReportsEnabled() {
+			def.ReportSkills = visibleReportSkills(reg)
+		}
+		for name := range catalogNames {
+			def.CatalogNativeNames = append(def.CatalogNativeNames, name)
 		}
 		return extra, def, cleanup
 	}
@@ -266,6 +266,9 @@ func wireTools(pg *db.DB, domainReg map[string]actool.CoreTool, metadata ...map[
 		out := tools[:0:0]
 		for _, t := range tools {
 			row, known := byKey[t.Name()]
+			if !known && t.Name() == "security_catalog" {
+				continue // the catalog helper requires an explicit enabled binding row
+			}
 			if !known { // MCP/skill/host tool: no row → untouched
 				out = append(out, t)
 				continue

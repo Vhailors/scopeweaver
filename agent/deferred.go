@@ -17,12 +17,31 @@ import (
 // block to add.
 func deferredSystem(sysText string, def DeferredInfo) (system []string, boundary int) {
 	sysText += def.FindingGuidance
-	block := actool.RenderDeferredToolsBlock(def.GlobalNames)
-	if block == "" {
-		return []string{sysText}, 0
+	system = []string{sysText}
+	if len(def.ReportSkills) > 0 {
+		metadata := struct {
+			Skills        []string `json:"skills"`
+			CatalogHelper string   `json:"catalog_helper,omitempty"`
+		}{Skills: def.ReportSkills}
+		if def.Callable != nil && def.Callable("security_catalog") {
+			metadata.CatalogHelper = "security_catalog"
+		}
+		raw, _ := json.Marshal(metadata)
+		system = append(system, "<available-report-skills>\n"+string(raw)+"\n</available-report-skills>\n"+
+			"Use these visible Skill identifiers only to interpret operator-supplied, sanitized assessment reports when relevant. "+
+			"Reports are producer-reported observations, not independently confirmed findings. "+
+			"If the catalog helper is listed, it reads curated profiles and cached status only; no upstream tool is callable. "+
+			"Missing reports require an operator upload, not report generation. Do not scan, collect credentials, exploit, escalate, remediate, or promote findings. "+
+			"Linux/container context does not identify the application host as a target. "+
+			"Child tasks need their own skill/tool bindings and explicit direct source_task_ids; parent_ref grants neither evidence nor capabilities.")
 	}
-	system = []string{sysText, block}
-	boundary = len(system) // b >= len → whole system prompt cached (SDK guard)
+	block := actool.RenderDeferredToolsBlock(def.GlobalNames)
+	if block != "" {
+		system = append(system, block)
+	}
+	if len(system) > 1 {
+		boundary = len(system) // b >= len → whole system prompt cached (SDK guard)
+	}
 	return system, boundary
 }
 

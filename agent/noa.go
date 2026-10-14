@@ -28,6 +28,7 @@ func noaWarn(session string) func(string) {
 // As an experiment, setup failure must not interrupt tasks: warn and retain built-in compaction.
 // On success clear opts.Compaction to avoid the warning about two context managers.
 func enableNoa(opts *agentcore.Options, enabled func() bool, archiveRoot, sessionID string, onWarn func(string)) {
+	defer configureCatalogHistory(opts)
 	if enabled == nil || !enabled() {
 		return
 	}

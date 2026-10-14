@@ -241,6 +241,12 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_expnodes_part     ON exploration_nodes(exploration_id, kind);
 CREATE INDEX IF NOT EXISTS idx_expnodes_frontier ON exploration_nodes(exploration_id, priority DESC)
     WHERE kind='intent' AND state='open';
+
+-- Assessment imports are immutable and byte-specific within one exploration.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_expnodes_assessment_import
+    ON exploration_nodes(exploration_id, (payload->>'assessment_id'))
+    WHERE kind='fact' AND payload ? 'assessment_id' AND payload ? 'assessment_import';
+
 DROP TRIGGER IF EXISTS trg_expnodes_upd ON exploration_nodes;
 CREATE TRIGGER trg_expnodes_upd BEFORE UPDATE ON exploration_nodes
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -850,6 +856,30 @@ ALTER TABLE mcp_servers ADD CONSTRAINT mcp_servers_transport_check
     CHECK (transport IN ('stdio','http','sse'));
 -- Add columns to older databases; schema.sql executes on every startup.
 ALTER TABLE mcp_servers ADD COLUMN IF NOT EXISTS insecure BOOLEAN NOT NULL DEFAULT false;
+-- Catalog-only identity is additive; existing generic rows keep their transports.
+ALTER TABLE mcp_servers ADD COLUMN IF NOT EXISTS provider_kind TEXT NOT NULL DEFAULT '';
+ALTER TABLE mcp_servers ADD COLUMN IF NOT EXISTS source_revision TEXT NOT NULL DEFAULT '';
+ALTER TABLE mcp_servers DROP CONSTRAINT IF EXISTS mcp_servers_provider_kind_check;
+ALTER TABLE mcp_servers ADD CONSTRAINT mcp_servers_provider_kind_check
+    CHECK (provider_kind IN ('', 'yeepforge', 'adstrike'));
+ALTER TABLE mcp_servers DROP CONSTRAINT IF EXISTS mcp_servers_source_revision_check;
+ALTER TABLE mcp_servers ADD CONSTRAINT mcp_servers_source_revision_check
+    CHECK (source_revision = '' OR source_revision ~ '^[0-9a-f]{40}$');
+ALTER TABLE mcp_servers DROP CONSTRAINT IF EXISTS mcp_servers_provider_stdio_check;
+ALTER TABLE mcp_servers ADD CONSTRAINT mcp_servers_provider_stdio_check
+    CHECK (provider_kind = '' OR (transport = 'stdio' AND COALESCE(url, '') = '' AND NOT insecure));
+
+CREATE OR REPLACE FUNCTION preserve_mcp_provider_kind() RETURNS trigger AS $$
+BEGIN
+    IF NEW.provider_kind IS DISTINCT FROM OLD.provider_kind THEN
+        RAISE EXCEPTION 'mcp_provider_identity_immutable' USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_mcp_provider_identity ON mcp_servers;
+CREATE TRIGGER trg_mcp_provider_identity BEFORE UPDATE ON mcp_servers
+    FOR EACH ROW EXECUTE FUNCTION preserve_mcp_provider_kind();
 DROP TRIGGER IF EXISTS trg_mcp_upd ON mcp_servers;
 CREATE TRIGGER trg_mcp_upd BEFORE UPDATE ON mcp_servers
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -859,6 +889,13 @@ CREATE TRIGGER trg_mcp_upd BEFORE UPDATE ON mcp_servers
 -- Insert only if absent, never replacing configured/enabled servers, since schema.sql runs every startup.
 INSERT INTO mcp_servers (name, transport, url, env, enabled)
 VALUES ('ScopeSentry', 'http', NULL, '{"X-API-Key":""}', false)
+ON CONFLICT (name) DO NOTHING;
+
+-- Never convert name collisions or recreate a template after a label rename.
+INSERT INTO mcp_servers (name, transport, provider_kind, enabled)
+SELECT name, 'stdio', kind, false
+FROM (VALUES ('YeepForge', 'yeepforge'), ('AdStrike', 'adstrike')) AS providers(name, kind)
+WHERE NOT EXISTS (SELECT 1 FROM mcp_servers WHERE provider_kind = providers.kind)
 ON CONFLICT (name) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS mcp_tools_cache (
@@ -872,6 +909,60 @@ CREATE TABLE IF NOT EXISTS mcp_tools_cache (
 );
 
 -- =====================================================================
+-- Catalog-only discovery metadata. Never used as executable tool registrations.
+-- Kept separate from generic MCP caches and from the configured source SHA.
+CREATE TABLE IF NOT EXISTS mcp_catalog_cache (
+    server_id          BIGINT PRIMARY KEY REFERENCES mcp_servers(id) ON DELETE CASCADE,
+    config_revision    TIMESTAMPTZ NOT NULL,
+    discovered_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    available          BOOLEAN NOT NULL,
+    executable_sha256  TEXT NOT NULL DEFAULT '',
+    observed_revision  TEXT NOT NULL DEFAULT '',
+    tools              JSONB NOT NULL DEFAULT '[]'
+);
+
+-- Remove the superseded mutable-label ledger mechanism on schema re-application.
+DROP TRIGGER IF EXISTS trg_mcp_catalog_aliases ON mcp_servers;
+DROP FUNCTION IF EXISTS remember_mcp_catalog_aliases();
+
+-- Labels belong to a surviving tagged identity, independently of discovery.
+CREATE TABLE IF NOT EXISTS mcp_catalog_labels (
+    server_id BIGINT NOT NULL REFERENCES mcp_servers(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    PRIMARY KEY (server_id, label)
+);
+INSERT INTO mcp_catalog_labels(server_id,label)
+SELECT id,name FROM mcp_servers WHERE provider_kind<>''
+ON CONFLICT DO NOTHING;
+CREATE OR REPLACE FUNCTION remember_mcp_catalog_labels() RETURNS trigger AS $$
+BEGIN
+    IF NEW.provider_kind<>'' THEN
+        INSERT INTO mcp_catalog_labels(server_id,label) VALUES (NEW.id,NEW.name)
+        ON CONFLICT DO NOTHING;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_mcp_catalog_labels ON mcp_servers;
+CREATE TRIGGER trg_mcp_catalog_labels AFTER INSERT OR UPDATE OF name ON mcp_servers
+FOR EACH ROW EXECUTE FUNCTION remember_mcp_catalog_labels();
+
+-- Durable per-use history metadata. Provider identity is captured at emission,
+-- not joined back to the current row: deleting a provider cannot change a birth.
+CREATE TABLE IF NOT EXISTS mcp_catalog_native_uses (
+    session_id    TEXT NOT NULL,
+    tool_use_id   TEXT NOT NULL,
+    provider_id   BIGINT NOT NULL,
+    provider_kind TEXT NOT NULL CHECK (provider_kind IN ('yeepforge', 'adstrike')),
+    tool_name     TEXT NOT NULL,
+    PRIMARY KEY (session_id, tool_use_id)
+);
+-- The persisted predecessor UUID identifies the exact assistant-message slot.
+-- Empty anchors are retained only for upgrade of round-four rows.
+ALTER TABLE mcp_catalog_native_uses ADD COLUMN IF NOT EXISTS message_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE mcp_catalog_native_uses DROP CONSTRAINT IF EXISTS mcp_catalog_native_uses_pkey;
+ALTER TABLE mcp_catalog_native_uses ADD PRIMARY KEY (session_id,message_id,tool_use_id);
+
 -- G. Visibility: agent x MCP / skill.
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS agent_visibility (

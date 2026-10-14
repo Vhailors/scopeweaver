@@ -52,7 +52,7 @@ function checkCatalog(source, translated, locale) {
 }
 
 test("every shipped catalog is complete and preserves placeholders and rich tags", () => {
-  assert.equal(Object.keys(catalogs.en).length, 3113);
+  assert.equal(Object.keys(catalogs.en).length, 3193);
   assert.deepEqual(catalogLocales.sort(), [...LOCALES].sort());
   assert.deepEqual(Object.keys(catalogs).sort(), [...LOCALES].sort());
   for (const locale of LOCALES) checkCatalog(catalogs.en, catalogs[locale], locale);

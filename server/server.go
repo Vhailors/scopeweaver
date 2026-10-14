@@ -222,8 +222,11 @@ func New(ctx context.Context, m *Manager, skillDir string, dataDir string, keyDi
 		wireAgentAugment(m.pg, s.skillDir, s.hostTools) // Assemble visible skills/MCP and traffic/orchestration host tools into agent toolsets.
 		domainReg := buildDomainReg(m.Assets())
 		wireTools(m.pg, domainReg, s.knownToolLanguages()) // Built-in tools: filter by agent, override descriptions/schemas, and inject defaults.
-		seedPrompts(m.pg)                                  // Seed built-in agent prompt bodies into agent_prompts only when empty.
-		s.seedOrchestrationTools()                         // Seed P2 cross-task orchestration tools for per-agent bindings.
+		if err := s.seedSecurityCatalog(); err != nil {
+			log.Printf(locale.Text(locale.ServerDefault(), "[tools] Could not seed %s: %v"), "security_catalog", err)
+		}
+		seedPrompts(m.pg)          // Seed built-in agent prompt bodies into agent_prompts only when empty.
+		s.seedOrchestrationTools() // Seed P2 cross-task orchestration tools for per-agent bindings.
 		if err := s.seedFindingRetester(); err != nil {
 			log.Printf("[retester] seed: %v", err)
 		}
@@ -688,6 +691,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/task-templates/{id}", s.pgUpdateTaskTemplate)
 	mux.HandleFunc("DELETE /api/task-templates/{id}", s.pgDeleteTaskTemplate)
 	mux.HandleFunc("GET /api/tasks/{id}", s.getTask)
+	mux.HandleFunc("POST /api/tasks/{id}/assessment-reports", s.importAssessmentReport)
+	mux.HandleFunc("GET /api/tasks/{id}/assessment-reports", s.listAssessmentReports)
 	mux.HandleFunc("PATCH /api/tasks/{id}", s.updateTaskMetadata)
 	mux.HandleFunc("PATCH /api/tasks/{id}/category", s.updateTaskCategory)
 	// Task-specific asset interception/allow rules.
@@ -942,7 +947,7 @@ func (s *Server) Handler() http.Handler {
 	// /api/* goes through CORS + JWT; everything else is served by the embedded
 	// frontend (public — auth is enforced client-side and on the API). With the
 	// no-embed build the webui handler just 404s (run `next dev` separately).
-	api := withLocale(cors(s.requireAuth(mux)))
+	api := withLocale(cors(s.assessmentReportsAuth(mux)))
 	root := http.NewServeMux()
 	root.Handle("/api/", api)
 	root.Handle("/", s.webuiHandler())
@@ -3303,6 +3308,7 @@ func (s *Server) settingsPayload() map[string]any {
 		"language":                 string(locale.ServerDefault()),
 		"traffic_capture":          s.m.TrafficEnabled(),
 		"agent_traffic_binding":    s.m.pg.GetBool(settingAgentTrafficBinding, false),
+		"security_reports_enabled": s.m.pg.SecurityReportsEnabled(),
 		"llm_record":               s.m.LLMRecordEnabled(),
 		"web_search_enabled":       on,
 		"web_search_backend":       backend,
@@ -3374,10 +3380,11 @@ func (s *Server) pgDetectPython(w http.ResponseWriter, r *http.Request) {
 // off, agents get no proxy config, no traffic tools, and no proxy prompt content.
 func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Language            *string `json:"language"`
-		TrafficCapture      *bool   `json:"traffic_capture"`
-		AgentTrafficBinding *bool   `json:"agent_traffic_binding"`
-		LLMRecord           *bool   `json:"llm_record"` // LLM recording defaults off and changes immediately without rebuilding agents.
+		Language               *string `json:"language"`
+		TrafficCapture         *bool   `json:"traffic_capture"`
+		AgentTrafficBinding    *bool   `json:"agent_traffic_binding"`
+		SecurityReportsEnabled *bool   `json:"security_reports_enabled"`
+		LLMRecord              *bool   `json:"llm_record"` // LLM recording defaults off and changes immediately without rebuilding agents.
 		// Web search. WebSearchEnabled/Backend toggle the tool + backend; BraveKey/TavilyKey
 		// are optional — omit (null) to leave a stored key untouched, send "" to clear.
 		WebSearchEnabled *bool   `json:"web_search_enabled"`
@@ -3424,6 +3431,12 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		locale.SetServerDefault(lang)
+	}
+	if req.SecurityReportsEnabled != nil {
+		if err := s.m.pg.SetBool(db.SettingSecurityReportsEnabled, *req.SecurityReportsEnabled); err != nil {
+			writeError(w, 500, err)
+			return
+		}
 	}
 	if req.ConstraintsInjectPlanner != nil {
 		if err := s.m.pg.SetBool(settingConstraintsInjectPlanner, *req.ConstraintsInjectPlanner); err != nil {

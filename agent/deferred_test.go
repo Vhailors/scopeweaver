@@ -1,10 +1,12 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
 
+	"github.com/Autumn-27/norma/agentcore"
 	"github.com/Autumn-27/norma/llm"
 	actool "github.com/Autumn-27/norma/tool"
 )
@@ -67,6 +69,61 @@ func TestSeedUnlockFromHistory(t *testing.T) {
 		t.Fatalf("unlocked=%v want [browsing recon]", got)
 	}
 	seedUnlockFromHistory(msgs, nil) // nil → no-op, no panic
+}
+
+func TestSeedUnlockCatalogHistory(t *testing.T) {
+	// Given resumed Skill output from an old tagged label and a generic server.
+	msgs := []llm.Message{
+		{Role: llm.RoleAssistant, Content: []llm.ContentBlock{
+			{Type: llm.BlockToolUse, ID: "skill", Name: "Skill", Input: json.RawMessage(`{"name":"catalog-probe"}`)},
+			{Type: llm.BlockToolUse, ID: "native", Name: "mcp__old-label__unexpected_operation", Input: json.RawMessage(`{}`)},
+		}},
+		{Role: llm.RoleUser, Content: []llm.ContentBlock{
+			llm.ToolResultText("skill", "<available-deferred-tools>\nmcp__old-label__unexpected_operation\nmcp__generic__allowed\n</available-deferred-tools>", false),
+			llm.ToolResultText("native", "fixture", true),
+		}},
+	}
+	unlock := actool.NewUnlockSet()
+	unlockSkill := func(name string) {
+		if name == "catalog-probe" {
+			unlock.Add("mcp__generic__allowed")
+		}
+	}
+	// When capability filtering leaves historical Skill free text untouched.
+	store, ctx, parent := deferredHistory(t, msgs)
+	filter := &nativeHistoryProvider{store: store, load: func(context.Context, string) (map[string]map[string]bool, error) {
+		return map[string]map[string]bool{parent: {"native": true}}, nil
+	}}
+	opts := agentcore.Options{Provider: filter, Transcript: store, SessionID: "history"}
+	configureCatalogHistory(&opts)
+	s := agentcore.NewSession(opts)
+	defer s.Close()
+	resumeCatalogSession(ctx, s, opts)
+	request, err := filter.request(ctx, llm.CompletionRequest{Messages: llm.MessagesForAPI(s.Messages())})
+	if err != nil {
+		t.Fatal(err)
+	}
+	filtered := request.Messages
+	for _, msg := range filtered {
+		for _, block := range msg.Content {
+			if block.Type == llm.BlockToolUse && block.ID == "native" ||
+				block.Type == llm.BlockToolResult && block.ToolUseID == "native" {
+				t.Fatal("marked native pair survived Skill history filtering")
+			}
+		}
+	}
+	seedUnlockFromHistory(filtered, unlockSkill)
+	raw, err := json.Marshal(filtered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Then free-text names survive but never grant a tagged capability/unlock.
+	if !strings.Contains(string(raw), "mcp__old-label__unexpected_operation") ||
+		!strings.Contains(string(raw), "mcp__generic__allowed") ||
+		!unlock.Has("mcp__generic__allowed") || unlock.Has("mcp__old-label__unexpected_operation") {
+		t.Fatalf("catalog resume boundary: %s", raw)
+	}
+	seedUnlockFromHistory(filtered, nil)
 }
 
 // TestUnlockGatingFlow mirrors what OnInvoke / seedUnlockFromHistory do: a gated

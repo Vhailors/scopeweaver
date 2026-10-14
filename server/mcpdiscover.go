@@ -22,6 +22,9 @@ type mcpClient interface {
 
 // connectMCP dials one MCP server per its transport. Callers must Close the client.
 func connectMCP(ctx context.Context, m *db.MCPServer) (mcpClient, error) {
+	if m.ProviderKind != "" {
+		return nil, &catalogError{Code: "explicit_only"}
+	}
 	switch m.Transport {
 	case "stdio":
 		if m.Command == "" {
@@ -78,7 +81,7 @@ func (s *Server) discoverEmptyMCPsOnStartup() {
 		return
 	}
 	for _, m := range servers {
-		if !m.Enabled || len(m.Tools) > 0 {
+		if m.ProviderKind != "" || !m.Enabled || len(m.Tools) > 0 {
 			continue
 		}
 		ctx, cancel := context.WithTimeout(s.ctx, 90*time.Second)

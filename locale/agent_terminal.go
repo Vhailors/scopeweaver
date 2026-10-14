@@ -1,6 +1,9 @@
 package locale
 
 func init() {
+	Register("Catalog-only tool operations were blocked by local host policy; no tagged tool was executed. Change the request before continuing.", "Catalog-only tool operations were blocked by local host policy; no tagged tool was executed. Change the request before continuing.", "로컬 호스트 정책이 카탈로그 전용 도구 작업을 차단했습니다. 해당 도구는 실행되지 않았습니다. 계속하려면 요청을 변경하세요.")
+	Register("Local host policy could not safely resolve catalog history or tool authorization; execution was stopped.", "Local host policy could not safely resolve catalog history or tool authorization; execution was stopped.", "로컬 호스트 정책이 카탈로그 기록이나 도구 실행 권한을 안전하게 확인하지 못해 실행을 중지했습니다.")
+	Register("Transcript resume failed; continuing with the SDK's fresh session.", "Transcript resume failed; continuing with the SDK's fresh session.", "대화 기록 복원에 실패했습니다. SDK의 새 세션으로 계속합니다.")
 	Register("User paused the task", "User paused the task", "사용자가 작업을 일시정지했습니다")
 	Register("The user paused the task through POST /api/tasks/{id}/control with action=pause. This Planner/Worker run was cancelled; running intents return to frontier(open), and will be claimed and restarted from the beginning on resume.", "The user paused the task through POST /api/tasks/{id}/control with action=pause. This Planner/Worker run was cancelled; running intents return to frontier(open), and will be claimed and restarted from the beginning on resume.", "사용자가 POST /api/tasks/{id}/control의 action=pause로 작업을 일시정지했습니다. 이번 Planner/Worker 실행은 취소되고 실행 중 의도는 frontier(open)로 돌아가며 재개 시 다시 배정되어 처음부터 실행됩니다.")
 	Register("Orchestrator agent paused the task", "Orchestrator agent paused the task", "편성 에이전트가 작업을 일시정지했습니다")

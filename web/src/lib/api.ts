@@ -17,6 +17,10 @@ import type {
   AgentDetail,
   AgentTrigger,
   ArchiveBatchItem,
+  AssessmentProducer,
+  AssessmentReportInput,
+  AssessmentReportPage,
+  AssessmentReportResult,
   Asset,
   AssetInterceptRule,
   AssetInterceptRuleInput,
@@ -65,6 +69,7 @@ import type {
   LLMRetryOverride,
   LLMRetryPolicy,
   LLMTask,
+  MCPCatalogStatus,
   MCPServer,
   MCPTool,
   MissingSkill,
@@ -233,6 +238,19 @@ export const api = {
   tasks: () =>
     get<{ tasks: Task[]; active: string }>("/tasks").then((r) => ({ tasks: arr(r.tasks), active: r.active ?? "" })),
   task: (id: string) => get<Task>(`/tasks/${encodeURIComponent(id)}`),
+  importAssessmentReport: (id: string, input: AssessmentReportInput) =>
+    post<AssessmentReportResult>(`/tasks/${encodeURIComponent(id)}/assessment-reports`, input),
+  // The supplied report text is forwarded verbatim inside the envelope, so the
+  // server validates and digests the operator's bytes rather than a re-serialization.
+  importAssessmentReportText: (id: string, producer: AssessmentProducer, report: string) =>
+    http<AssessmentReportResult>(`/tasks/${encodeURIComponent(id)}/assessment-reports`, {
+      method: "POST",
+      body: `{"producer":${JSON.stringify(producer)},"report":${report}}`,
+    }),
+  assessmentReports: (id: string, before?: number) =>
+    get<AssessmentReportPage>(
+      `/tasks/${encodeURIComponent(id)}/assessment-reports${before === undefined ? "" : `?before=${before}`}`,
+    ),
   createTask: (input: {
     name?: string;
     categoryId?: number;
@@ -1126,6 +1144,9 @@ export const api = {
   deleteMcpServer: (id: number) => del<{ deleted: number }>(`/mcp/${id}`),
   mcpTools: (id: number) => get<{ tools: MCPTool[] }>(`/mcp/${id}/tools`).then((r) => arr(r.tools)),
   refreshMcpServer: (id: number) => post<{ tools: MCPTool[] }>(`/mcp/${id}/refresh`, {}).then((r) => arr(r.tools)),
+  // Tagged catalog providers: explicit discovery returns cached status, never callable tools.
+  refreshMcpCatalog: (id: number) =>
+    post<{ catalog: MCPCatalogStatus }>(`/mcp/${id}/refresh`, {}).then((r) => r.catalog),
 
   // Asset synchronization from ScopeSentry.
   ssStatus: () =>

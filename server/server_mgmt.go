@@ -849,7 +849,11 @@ func (s *Server) pgResetTool(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		schema, _ := json.Marshal(t.InputSchema())
-		if err := pg.UpsertToolForce(t.Name(), t.Description(), schema, autoAgents); err != nil {
+		bindings := autoAgents
+		if t.Name() == "security_catalog" {
+			bindings, _ = json.Marshal(catalogHelperAgents)
+		}
+		if err := pg.UpsertToolForce(t.Name(), t.Description(), schema, bindings); err != nil {
 			writeError(w, 500, err)
 			return
 		}
@@ -884,19 +888,24 @@ func (s *Server) pgSaveMCP(w http.ResponseWriter, r *http.Request) {
 	}
 	var m db.MCPServer
 	if err := decode(r, &m); err != nil {
-		writeError(w, 400, err)
+		writeErr(w, http.StatusBadRequest, locale.T(responseLanguage(w), "mcp.provider.invalid_json"))
 		return
 	}
 	isNew := m.ID == 0
 	id, err := pg.SaveMCP(&m)
 	if err != nil {
+		var validation *db.MCPValidationError
+		if errors.As(err, &validation) {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
 		writeError(w, 500, err)
 		return
 	}
 	// On initial add, auto-discover + cache the tool list so the UI shows it right
 	// away (bounded so a slow/broken server can't hang the request). Skipped on
 	// plain updates (e.g. enable toggles) to avoid re-spawning the server each time.
-	if isNew && m.Enabled {
+	if isNew && m.Enabled && m.ProviderKind == "" {
 		m.ID = id
 		ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 		if derr := s.discoverAndCacheMCP(ctx, &m); derr != nil {
@@ -944,6 +953,10 @@ func (s *Server) pgRefreshMCP(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, locale.Text(responseLanguage(w), "MCP server not found"))
 		return
 	}
+	if target.ProviderKind != "" {
+		s.refreshSecurityCatalog(w, r, target)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
 	if err := s.discoverAndCacheMCP(ctx, target); err != nil {
@@ -961,6 +974,17 @@ func (s *Server) pgMCPTools(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := pathInt(r, "id")
+	all, err := pg.ListMCP()
+	if err != nil {
+		writeError(w, 500, err)
+		return
+	}
+	for _, m := range all {
+		if m.ID == id && m.ProviderKind != "" {
+			writeJSON(w, 200, map[string]any{"tools": []db.MCPTool{}, "catalog": m.Catalog})
+			return
+		}
+	}
 	tools, err := pg.MCPToolsDetailed(id)
 	if err != nil {
 		writeError(w, 500, err)

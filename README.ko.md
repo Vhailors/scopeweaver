@@ -35,6 +35,8 @@ LLM 멀티 에이전트 기반 자율 침투 테스트 시스템 (Go 백엔드 +
 언어가 없는 이전 작업은 서버 기본값을 사용합니다. 내장 에이전트 지침과 출력 안내는 실행 언어를
 따르며 사용자 편집 템플릿과 저장된 증거는 보존합니다. 보고서/CSV/ZIP 표시는 내보내기 요청의
 언어를 사용합니다. [전체 한국어 문서](docs/ko/README.md)에 내장 스킬 참고서도 있습니다.
+YeepForge, AdStrike, confirmesc 보고서를 가져오는 선택 기능은
+[보안 보고서 연동](docs/ko/security-tool-integrations.md)을 참고하세요.
 
 ## 스크린샷
 
@@ -281,12 +283,17 @@ docker image prune -f          # 오래된 이미지 정리 (선택)
 ### 방법 4: 사전 빌드 바이너리 (Releases)
 
 새 `scopeweaver-<version>-<os>-<arch>.zip`을 내려받아 옛 프로세스를 멈추고,
-`scopeweaver`와 `skills/`를 덮어쓴 뒤(`config.json`과 `data/`는 유지) 재시작합니다.
+`scopeweaver`를 덮어쓴 뒤(`config.json`, `data/`, `skills/`는 유지) 재시작합니다.
 
 ```bash
-cp -r <풀어낸_디렉터리>/skills ./ && cp <풀어낸_디렉터리>/scopeweaver ./
+cp <풀어낸_디렉터리>/scopeweaver ./
 ./start.sh
 ```
+
+풀어낸 `skills/`를 그대로 덮어쓰지 마세요. 직접 수정한 스킬이 바뀝니다. 새 릴리스에 추가된 스킬만
+설치하려면 없는 스킬 디렉터리를 각각 zip으로 묶어 인증된 `POST /api/skills/upload`(멀티파트 필드
+`file`)로 `overwrite=true` 없이 업로드합니다. 이미 있는 스킬은 409를 반환하고 그대로 유지됩니다.
+[보안 보고서 연동 문서](docs/ko/security-tool-integrations.md#기존-바이너리-설치-업그레이드)를 참고하세요.
 
 ### 방법 5: 소스에서 빌드
 

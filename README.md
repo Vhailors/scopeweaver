@@ -43,6 +43,8 @@ restarts; older tasks without saved language use the server default. Built-in ag
 output instructions use the run language; user-edited templates and stored evidence remain intact.
 Report/CSV/ZIP labels use the export request's language. [Full documentation](docs/README.md) and
 [Korean references](docs/ko/README.md) include the bundled skill guidance.
+Optional report import for YeepForge, AdStrike and confirmesc:
+[security report integration](docs/security-tool-integrations.md).
 
 ## Screenshots
 
@@ -285,12 +287,18 @@ docker image prune -f          # clean up old images (optional)
 ### Option 4: prebuilt binary (Releases)
 
 Download the new `scopeweaver-<version>-<os>-<arch>.zip`, stop the old process,
-overwrite `scopeweaver` and `skills/` (keep your `config.json` and `data/`), and restart:
+overwrite `scopeweaver` (keep your `config.json`, `data/` and `skills/`), and restart:
 
 ```bash
-cp -r <unpacked>/skills ./ && cp <unpacked>/scopeweaver ./
+cp <unpacked>/scopeweaver ./
 ./start.sh
 ```
+
+Do not copy the unpacked `skills/` over yours: that replaces skills you customized. To add skills that
+are new in a release, zip each missing skill directory and upload it to the authenticated
+`POST /api/skills/upload` (multipart field `file`) without `overwrite=true`. A skill that already
+exists returns 409 and stays unchanged. See
+[security report integration](docs/security-tool-integrations.md#upgrading-an-existing-binary-install).
 
 ### Option 5: build from source
 

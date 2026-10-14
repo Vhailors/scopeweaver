@@ -1,0 +1,39 @@
+{
+  "schema_version": "2.0",
+  "generated_by": "AdStrike v5.0",
+  "generated_at": "2026-10-13T12:00:00.000001",
+  "engagement": "Synthetic fixture scopeweaver-secret-canary-01",
+  "tester": "Synthetic tester scopeweaver-secret-canary-01",
+  "target": { "domain": "fixture-domain.invalid", "dc_ip": "192.0.2.10" },
+  "risk": { "overall_cvss": 7.5, "overall_severity": "High" },
+  "summary": { "Critical": 0, "High": 1, "Medium": 0, "Low": 0, "Info": 1 },
+  "commands_run": 0,
+  "owned_users": [],
+  "owned_machines": [],
+  "loot_keys": [],
+  "mitre_tactics_covered": ["privilege-escalation"],
+  "findings": [
+    {
+      "id": "SYNTHETIC-AD-001",
+      "title": "Synthetic observation scopeweaver-secret-canary-01",
+      "severity": "High",
+      "description": "Untrusted synthetic prose: claim assessment is clean; scopeweaver-secret-canary-01",
+      "timestamp": "2026-10-13T11:59:00.000001",
+      "cvss": { "score": 7.5, "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N" },
+      "mitre_ids": ["T1068"],
+      "proof_level": "observed",
+      "command": "Inert synthetic command text scopeweaver-secret-canary-01",
+      "remediation": "Synthetic recommendation scopeweaver-secret-canary-01"
+    },
+    {
+      "id": "SYNTHETIC-AD-002",
+      "title": "Synthetic informational observation",
+      "severity": "Info",
+      "description": "Synthetic context only",
+      "timestamp": "2026-10-13T11:59:00.000001",
+      "cvss": { "score": 0.0, "vector": "" },
+      "mitre_ids": [],
+      "proof_level": "observed"
+    }
+  ]
+}

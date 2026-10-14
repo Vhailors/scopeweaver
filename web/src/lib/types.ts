@@ -4,6 +4,51 @@
 export type TaskStatus = "created" | "queued" | "running" | "paused" | "done" | "failed" | "timeout";
 export type EngineMode = "exploring" | "paused" | "stalled" | "idle";
 
+export type AssessmentProducer = "yeepforge" | "adstrike" | "confirmesc";
+
+export type AssessmentParserProfile = "yeepforge-json-ee07fe3" | "adstrike-json-2.0" | "confirmesc-json-36f1ec8";
+
+export type AssessmentCompleteness = "unknown" | "has_errors" | "no_observations";
+
+// Inbound producer data is untrusted JSON, never a sanitized assessment.
+export interface AssessmentReportInput {
+  readonly producer: AssessmentProducer;
+  readonly report: object;
+}
+
+export interface AssessmentReportResult {
+  readonly assessment_id: string;
+  readonly fact_id: number;
+  readonly duplicate: boolean;
+  readonly producer: AssessmentProducer;
+  readonly parser_profile: AssessmentParserProfile;
+  readonly validation_status: "producer_reported";
+  readonly observation_count: number;
+  readonly completeness: AssessmentCompleteness;
+  readonly recommended_skill?: AssessmentProducer;
+  // Operator availability does not imply visibility to any agent.
+  readonly recommendation_context?: "operator_library";
+}
+
+export interface AssessmentReportSummary extends AssessmentReportResult {
+  readonly summary: string;
+  readonly parser_version: 1;
+  readonly parser_source_revision: string;
+  readonly source_verification: "unverified";
+  readonly runtime_verification: "unverified";
+  readonly original_sha256: string;
+  readonly sanitized_sha256: string;
+  readonly imported_at: string;
+  readonly observed_at?: string;
+  readonly error_count: number;
+}
+
+export interface AssessmentReportPage {
+  readonly reports: readonly AssessmentReportSummary[];
+  readonly has_more: boolean;
+  readonly next_before: number;
+}
+
 export interface Task {
   id: string;
   name?: string; // Optional task name; blank/omitted falls back to description for display.
@@ -950,6 +995,8 @@ export interface Settings {
   notify_enabled?: boolean; // Notification master switch defaults on and can pause all delivery during maintenance.
   notify_public_base_url?: string; // Externally accessible finding-detail backlink base; empty omits backlinks.
   notify_digest_interval_min?: number; // Digest interval in minutes, default 30.
+  // Supplied-report intake and catalog helper; absent means off. Never makes provider tools callable.
+  security_reports_enabled?: boolean;
 }
 
 // Vulnerability instant-message notifications.
@@ -1182,6 +1229,35 @@ export interface MCPServer {
   enabled: boolean;
   insecure?: boolean; // http: skip TLS cert verification (self-signed servers)
   tools?: string[]; // mcp_tools_cache (names only, for the count)
+  // Always sent by the server; optional so offline demo fixtures stay generic rows.
+  provider_kind?: MCPProviderKind; // Immutable after creation; empty means a generic MCP server.
+  source_revision?: string; // Configured expected upstream SHA, not measured executable provenance.
+  updated_at?: string;
+  catalog?: MCPCatalogStatus; // Present only for tagged catalog providers.
+}
+
+export type MCPProviderKind = "" | "yeepforge" | "adstrike";
+
+export type MCPCatalogState = "not_configured" | "disabled" | "not_discovered" | "discovered" | "stale" | "unavailable";
+
+// Cached metadata from the last explicit refresh. Names are never agent-callable tools.
+export interface MCPCatalogCache {
+  config_revision: string;
+  discovered_at: string;
+  available: boolean;
+  executable_sha256: string;
+  observed_revision: string;
+  tools: MCPTool[];
+}
+
+export interface MCPCatalogStatus {
+  status: MCPCatalogState;
+  configured: boolean;
+  enabled: boolean; // Eligible for explicit refresh only.
+  callable: false;
+  provenance: "unverified";
+  expected_source_revision: string;
+  cache?: MCPCatalogCache;
 }
 
 export interface MCPTool {

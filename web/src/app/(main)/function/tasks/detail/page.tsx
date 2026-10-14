@@ -406,7 +406,11 @@ function TaskDetailInner() {
         <div className="no-scrollbar min-w-0 overflow-x-auto">
           <TabsList variant="default" className="min-w-max">
             {TABS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value}>
+              <TabsTrigger
+                key={t.value}
+                value={t.value}
+                data-testid={t.value === "report" ? "task-report-tab" : undefined}
+              >
                 {t.label}
                 {t.value === "intercept" && interceptPendingCount > 0 && (
                   <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-none text-white">

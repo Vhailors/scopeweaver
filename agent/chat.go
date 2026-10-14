@@ -126,7 +126,7 @@ func (c *ChatAgent) Chat(ctx context.Context, agentKey, sessionID, message strin
 
 	system, boundary := deferredSystem(chatSystem(agentKey, c.workDir, sessionWorkDir, locale.FromContext(ctx)), def)
 	opts := agentcore.Options{
-		Provider:        c.prov,
+		Provider:        deferredProvider(c.prov, def, c.tx),
 		SystemPrompt:    append(system, outputLanguageInstruction(locale.FromContext(ctx))),
 		DynamicBoundary: boundary,
 		Tools:           tools,
@@ -176,7 +176,7 @@ func (c *ChatAgent) Chat(ctx context.Context, agentKey, sessionID, message strin
 	// reload prior conversation so the agent has context across turns (each Chat is
 	// a fresh session). First turn: no file yet → Resume loads nothing and proceeds.
 	if c.tx != nil {
-		_ = s.Resume(sessionID)
+		resumeCatalogSession(ctx, s, opts)
 	}
 	// re-unlock skill-gated MCPs from prior Skill() calls in the reloaded history so
 	// revealed tools stay callable across the fresh session.

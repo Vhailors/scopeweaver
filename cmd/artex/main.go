@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/Autumn-27/artex/locale"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -118,9 +119,14 @@ func run() int {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	ln, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatalf("serve: %v", err)
+	}
+
 	go func() {
 		log.Printf("ScopeWeaver %s backend listening on %s (data=%s, workers=%d)", version, *addr, *dataDir, mgr.Workers())
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("serve: %v", err)
 		}
 	}()

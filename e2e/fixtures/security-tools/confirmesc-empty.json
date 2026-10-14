@@ -1,0 +1,6 @@
+{
+  "meta": { "hostname": "fixture-host.invalid", "user": "Synthetic user", "kernel": "synthetic-kernel" },
+  "duration": null,
+  "findings": [],
+  "errors": {}
+}

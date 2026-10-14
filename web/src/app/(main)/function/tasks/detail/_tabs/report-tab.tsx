@@ -7,6 +7,7 @@ import * as React from "react";
 import { CheckIcon, CopyIcon, FileTextIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { AssessmentReportImport } from "@/components/assessment-report-import";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,18 +75,21 @@ export function ReportTab({ taskId }: { taskId: string }) {
   }
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <FileTextIcon className="size-4" /> {swt("interface.m0679")}</CardTitle>
-        <div className="flex gap-2">
-          {report && (
-            <Button size="sm" variant="outline" onClick={copy}>
-              {copied ? <CheckIcon /> : <CopyIcon />} {swt("interface.m0680")}</Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>{content}</CardContent>
-    </Card>
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <FileTextIcon className="size-4" /> {swt("interface.m0679")}</CardTitle>
+          <div className="flex gap-2">
+            {report && (
+              <Button size="sm" variant="outline" onClick={copy}>
+                {copied ? <CheckIcon /> : <CopyIcon />} {swt("interface.m0680")}</Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>{content}</CardContent>
+      </Card>
+      <AssessmentReportImport taskId={taskId} />
+    </div>
   );
 }
