@@ -18,6 +18,7 @@ import (
 // from history on a resumed session (design doc C2).
 type DeferredInfo struct {
 	FindingGuidance    string            // derived from the final permitted tools, including DB overrides
+	ReportSkills       []string          // enabled report-analysis identifiers from the visible Skill registry
 	Deferred           []string          // all MCP tool names (schema withheld)
 	GlobalNames        []string          // MCP names to list in the system-prompt block
 	Unlock             *actool.UnlockSet // shared call-gate; nil when no MCP tools
@@ -86,6 +87,9 @@ func AugmentTools(ctx context.Context, agentKey string, base []actool.CoreTool) 
 	registered := map[string]bool{}
 	for _, t := range out {
 		registered[t.Name()] = true
+	}
+	if !registered["Skill"] {
+		def.ReportSkills = nil
 	}
 	// The SDK dispatches direct calls through its registry. UnlockSet gates
 	// ExecuteExtraTool, not direct execution of a registered deferred tool.

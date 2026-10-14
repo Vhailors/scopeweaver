@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/Autumn-27/artex/db"
 	"github.com/Autumn-27/artex/locale"
-	"github.com/Autumn-27/norma/skill"
 	actool "github.com/Autumn-27/norma/tool"
 )
 
@@ -93,17 +91,14 @@ func (s *Server) toolSecurityCatalog(agentKey string, langs ...locale.Lang) acto
 			if input.Producer != "" && input.Producer != "yeepforge" && input.Producer != "adstrike" && input.Producer != "confirmesc" {
 				return failure("invalid_request")
 			}
-			skills, err := s.m.pg.AgentSkillNames(a.ID)
+			reg, err := visibleSkillRegistry(s.m.pg, s.skillDir, a.ID)
 			if err != nil {
 				return failure("unavailable")
 			}
-			visible := map[string]bool{}
-			if reg, err := skill.LoadDir(s.skillDir); err == nil && reg != nil {
-				for _, loaded := range reg.List() {
-					name := filepath.Base(loaded.Dir)
-					if loaded.Name == name && contains(skills, name) {
-						visible[name] = true
-					}
+			visible := visibleReportSkills(reg)
+			for _, row := range rows {
+				if row.Key == "Skill" && (!row.Enabled || !contains(row.Agents, agentKey)) {
+					visible = nil
 				}
 			}
 			ids, err := s.m.pg.AgentVisible(a.ID, "mcp")
@@ -120,7 +115,7 @@ func (s *Server) toolSecurityCatalog(agentKey string, langs ...locale.Lang) acto
 				if input.Producer != "" && profile.Producer != input.Producer {
 					continue
 				}
-				if visible[profile.Producer] {
+				if contains(visible, profile.Producer) {
 					profile.Skill = profile.Producer
 				}
 				for _, provider := range providers {

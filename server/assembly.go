@@ -6,7 +6,6 @@ import (
 	"github.com/Autumn-27/artex/locale"
 	"io"
 	"log"
-	"path/filepath"
 	"strings"
 
 	"github.com/Autumn-27/artex/agent"
@@ -26,32 +25,14 @@ import (
 func wireAgentAugment(pg *db.DB, skillDir string, hostTools func(context.Context) ([]actool.CoreTool, map[string][]string)) {
 	agent.ToolAugment = func(ctx context.Context, agentKey string) ([]actool.CoreTool, agent.DeferredInfo, func()) {
 		a, err := pg.GetAgentByKey(agentKey)
-		if err != nil || a == nil {
+		if err != nil || a == nil || !a.Enabled {
 			return nil, agent.DeferredInfo{}, nil
 		}
 		var extra []actool.CoreTool
 
 		// --- skills: load visible skills into reg (used for the Skill meta-tool
 		// and to know which MCP servers are skill-gated). ---
-		var reg *skill.Registry
-		if names, _ := pg.AgentSkillNames(a.ID); len(names) > 0 {
-			nameSet := make(map[string]bool, len(names))
-			for _, n := range names {
-				nameSet[n] = true
-			}
-			if allReg, err := skill.LoadDir(skillDir); err == nil && allReg != nil {
-				reg = skill.NewRegistry()
-				for _, s := range allReg.List() {
-					// match by directory name (Base of Dir), not by skill display Name
-					if s.Dir != "" && nameSet[filepath.Base(s.Dir)] {
-						reg.Add(s)
-					}
-				}
-				if len(reg.List()) == 0 {
-					reg = nil
-				}
-			}
-		}
+		reg, _ := visibleSkillRegistry(pg, skillDir, a.ID)
 		// A server named by any visible skill's `mcps:` is skill-gated: its tools
 		// are deferred + locked (not in the global block) until that skill loads.
 		gated := map[string]bool{}
@@ -189,6 +170,9 @@ func wireAgentAugment(pg *db.DB, skillDir string, hostTools func(context.Context
 			CatalogUse:    pg.RecordCatalogNativeUse,
 			CatalogUseIDs: pg.CatalogNativeUseIDs,
 		}
+		if pg.SecurityReportsEnabled() {
+			def.ReportSkills = visibleReportSkills(reg)
+		}
 		for name := range catalogNames {
 			def.CatalogNativeNames = append(def.CatalogNativeNames, name)
 		}
@@ -282,6 +266,9 @@ func wireTools(pg *db.DB, domainReg map[string]actool.CoreTool, metadata ...map[
 		out := tools[:0:0]
 		for _, t := range tools {
 			row, known := byKey[t.Name()]
+			if !known && t.Name() == "security_catalog" {
+				continue // the catalog helper requires an explicit enabled binding row
+			}
 			if !known { // MCP/skill/host tool: no row → untouched
 				out = append(out, t)
 				continue
