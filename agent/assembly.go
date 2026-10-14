@@ -17,11 +17,15 @@ import (
 // UnlockSkill unlocks a named skill's MCPs — hosts call it to rebuild the unlock set
 // from history on a resumed session (design doc C2).
 type DeferredInfo struct {
-	FindingGuidance string            // derived from the final permitted tools, including DB overrides
-	Deferred        []string          // all MCP tool names (schema withheld)
-	GlobalNames     []string          // MCP names to list in the system-prompt block
-	Unlock          *actool.UnlockSet // shared call-gate; nil when no MCP tools
-	UnlockSkill     func(skillName string)
+	FindingGuidance    string            // derived from the final permitted tools, including DB overrides
+	Deferred           []string          // all MCP tool names (schema withheld)
+	GlobalNames        []string          // MCP names to list in the system-prompt block
+	Unlock             *actool.UnlockSet // shared call-gate; nil when no MCP tools
+	UnlockSkill        func(skillName string)
+	CatalogNativeNames []string // exact known catalog-native names, never executable capabilities
+	CatalogUse         func(context.Context, string, string, string, string) error
+	CatalogUseIDs      func(context.Context, string) (map[string]map[string]bool, error)
+	Callable           func(string) bool
 }
 
 // ToolAugment, if set, returns the EXTRA tools an agent should see beyond its
@@ -61,10 +65,32 @@ func AugmentTools(ctx context.Context, agentKey string, base []actool.CoreTool) 
 	if ToolResolve != nil {
 		out = ToolResolve(ctx, agentKey, out)
 	}
+	if len(def.CatalogNativeNames) > 0 {
+		blocked := make(map[string]bool, len(def.CatalogNativeNames))
+		for _, name := range def.CatalogNativeNames {
+			blocked[name] = true
+		}
+		for _, t := range out {
+			delete(blocked, t.Name()) // actual registered tools always win
+		}
+		def.CatalogNativeNames = nil
+		for name := range blocked {
+			def.CatalogNativeNames = append(def.CatalogNativeNames, name)
+		}
+	}
 	out = localizeBuiltinTools(out, locale.FromContext(ctx))
 	out, def.FindingGuidance = findingWorkflowTools(agentKey, out, locale.FromContext(ctx))
 	for i, t := range out {
 		out[i] = guardPanic(t)
+	}
+	registered := map[string]bool{}
+	for _, t := range out {
+		registered[t.Name()] = true
+	}
+	// The SDK dispatches direct calls through its registry. UnlockSet gates
+	// ExecuteExtraTool, not direct execution of a registered deferred tool.
+	def.Callable = func(name string) bool {
+		return registered[name]
 	}
 	return out, def, cleanup
 }

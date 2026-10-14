@@ -18,6 +18,7 @@ import (
 
 func (s *Server) platformTools(langs ...locale.Lang) []actool.CoreTool {
 	return []actool.CoreTool{
+		s.toolSecurityCatalog("", langs...),
 		s.toolCreateSkill(langs...),
 		s.toolUpdateSkillFile(langs...),
 		s.toolCreateCustomTool(langs...),

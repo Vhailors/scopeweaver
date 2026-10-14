@@ -415,7 +415,7 @@ func (w *Worker) execute(ctx context.Context, name string, taskID int64, as *db.
 		settle = wrapupSettlementForTask("worker", []string{"Bash"}, clamped)
 	}
 	opts := agentcore.Options{
-		Provider:        w.prov,
+		Provider:        deferredProvider(w.prov, def, w.tx),
 		SystemPrompt:    append(system, outputLanguageInstruction(locale.FromContext(ctx))),
 		DynamicBoundary: boundary,
 		Tools:           tools,

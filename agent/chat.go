@@ -126,7 +126,7 @@ func (c *ChatAgent) Chat(ctx context.Context, agentKey, sessionID, message strin
 
 	system, boundary := deferredSystem(chatSystem(agentKey, c.workDir, sessionWorkDir, locale.FromContext(ctx)), def)
 	opts := agentcore.Options{
-		Provider:        c.prov,
+		Provider:        deferredProvider(c.prov, def, c.tx),
 		SystemPrompt:    append(system, outputLanguageInstruction(locale.FromContext(ctx))),
 		DynamicBoundary: boundary,
 		Tools:           tools,

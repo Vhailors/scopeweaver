@@ -44,6 +44,12 @@ func (s *Server) hostTools(ctx context.Context) ([]actool.CoreTool, map[string][
 	tools := append(s.m.HostTools(locale.FromContext(ctx)), s.orchestrationTools(locale.FromContext(ctx))...)
 	tools = append(tools, s.findingRetestTools(locale.FromContext(ctx))...)
 	tools = append(tools, s.platformTools(locale.FromContext(ctx))...) // Platform tools for Auto to create/edit skills, tools, and MCP servers.
+	agentKey, _ := ctx.Value(catalogAgentKey{}).(string)
+	for i, t := range tools {
+		if t.Name() == "security_catalog" {
+			tools[i] = s.toolSecurityCatalog(agentKey, locale.FromContext(ctx))
+		}
+	}
 	custom, err := s.customToolsForLanguage(locale.FromContext(ctx))
 	if err != nil {
 		log.Printf(locale.Text(locale.ServerDefault(), "[custom-tool] Loading failed: %v"), err)

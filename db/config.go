@@ -806,19 +806,20 @@ func (d *DB) ListPromptVersions(agentID int64) ([]PromptVersion, error) {
 // ---------- MCP servers ----------
 
 type MCPServer struct {
-	ProviderKind   string          `json:"provider_kind"`
-	SourceRevision string          `json:"source_revision"` // configured source SHA, not measured executable provenance
-	UpdatedAt      time.Time       `json:"updated_at"`
-	ID             int64           `json:"id"`
-	Name           string          `json:"name"`
-	Transport      string          `json:"transport"`
-	Command        string          `json:"command,omitempty"`
-	Args           json.RawMessage `json:"args"`
-	Env            json.RawMessage `json:"env"`
-	URL            string          `json:"url,omitempty"`
-	Enabled        bool            `json:"enabled"`
-	Insecure       bool            `json:"insecure"`        // http: skip TLS cert verification (self-signed servers, issue #108)
-	Tools          []string        `json:"tools,omitempty"` // cached tool names (mcp_tools_cache)
+	ProviderKind   string            `json:"provider_kind"`
+	SourceRevision string            `json:"source_revision"` // configured source SHA, not measured executable provenance
+	UpdatedAt      time.Time         `json:"updated_at"`
+	ID             int64             `json:"id"`
+	Name           string            `json:"name"`
+	Transport      string            `json:"transport"`
+	Command        string            `json:"command,omitempty"`
+	Args           json.RawMessage   `json:"args"`
+	Env            json.RawMessage   `json:"env"`
+	URL            string            `json:"url,omitempty"`
+	Enabled        bool              `json:"enabled"`
+	Insecure       bool              `json:"insecure"`        // http: skip TLS cert verification (self-signed servers, issue #108)
+	Tools          []string          `json:"tools,omitempty"` // cached tool names (mcp_tools_cache)
+	Catalog        *MCPCatalogStatus `json:"catalog,omitempty"`
 }
 
 func (d *DB) ListMCP() ([]*MCPServer, error) {
@@ -844,6 +845,13 @@ func (d *DB) ListMCP() ([]*MCPServer, error) {
 	rows.Close() // free the connection before the per-server tool-cache queries below
 	// Attach each server's cached tool names (best-effort; empty until discovered).
 	for _, m := range out {
+		if m.ProviderKind != "" {
+			m.Catalog, err = d.MCPProviderStatus(m)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
 		m.Tools, _ = d.MCPToolNames(m.ID)
 	}
 	return out, nil

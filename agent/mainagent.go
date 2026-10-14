@@ -120,7 +120,7 @@ func (m *MainAgent) Chat(ctx context.Context, taskID int64, mainSeg int, as *db.
 	ctx = intercept.WithReviewWorkingDirectory(ctx, mainDir)
 	system, boundary := deferredSystem(mainAgentSystem(goal, m.workDir, mainDir, locale.FromContext(ctx)), def)
 	opts := agentcore.Options{
-		Provider:        m.prov,
+		Provider:        deferredProvider(m.prov, def, m.tx),
 		SystemPrompt:    append(system, outputLanguageInstruction(locale.FromContext(ctx))),
 		DynamicBoundary: boundary,
 		Tools:           tools,

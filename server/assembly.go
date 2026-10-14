@@ -71,11 +71,22 @@ func wireAgentAugment(pg *db.DB, skillDir string, hostTools func(context.Context
 		serverTools := map[string][]string{} // server name → its tool names
 		var allNames, globalNames []string
 		globalSet := map[string]bool{}
+		catalogNames := map[string]bool{}
 		{
 			mcpIDs, _ := pg.AgentVisible(a.ID, "mcp")
 			want := idSet(mcpIDs)
 			all, _ := pg.ListMCP()
 			for _, m := range all {
+				if m.ProviderKind != "" {
+					// Cached native names identify structural history entries, not
+					// executable tools. History is classified separately at birth.
+					if m.Catalog != nil && m.Catalog.Cache != nil {
+						for _, t := range m.Catalog.Cache.Tools {
+							catalogNames["mcp__"+m.Name+"__"+t.Name] = true
+						}
+					}
+					continue // catalog metadata never grants a connection or native tools
+				}
 				if !m.Enabled {
 					continue
 				}
@@ -150,7 +161,7 @@ func wireAgentAugment(pg *db.DB, skillDir string, hostTools func(context.Context
 		// tools flagged deferred contribute their names to the deferred wiring so
 		// their schema is withheld (SearchExtraTools/ExecuteExtraTool), same as MCP.
 		if hostTools != nil {
-			ht, deferredBinds := hostTools(ctx)
+			ht, deferredBinds := hostTools(context.WithValue(ctx, catalogAgentKey{}, a.Key))
 			extra = append(extra, ht...)
 			for name, boundAgents := range deferredBinds {
 				if !contains(boundAgents, a.Key) {
@@ -171,10 +182,15 @@ func wireAgentAugment(pg *db.DB, skillDir string, hostTools func(context.Context
 			}
 		}
 		def := agent.DeferredInfo{
-			Deferred:    allNames,
-			GlobalNames: globalNames,
-			Unlock:      unlock,
-			UnlockSkill: unlockSkill,
+			Deferred:      allNames,
+			GlobalNames:   globalNames,
+			Unlock:        unlock,
+			UnlockSkill:   unlockSkill,
+			CatalogUse:    pg.RecordCatalogNativeUse,
+			CatalogUseIDs: pg.CatalogNativeUseIDs,
+		}
+		for name := range catalogNames {
+			def.CatalogNativeNames = append(def.CatalogNativeNames, name)
 		}
 		return extra, def, cleanup
 	}
