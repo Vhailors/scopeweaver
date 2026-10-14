@@ -891,12 +891,9 @@ INSERT INTO mcp_servers (name, transport, url, env, enabled)
 VALUES ('ScopeSentry', 'http', NULL, '{"X-API-Key":""}', false)
 ON CONFLICT (name) DO NOTHING;
 
--- Never convert name collisions or recreate a template after a label rename.
-INSERT INTO mcp_servers (name, transport, provider_kind, enabled)
-SELECT name, 'stdio', kind, false
-FROM (VALUES ('YeepForge', 'yeepforge'), ('AdStrike', 'adstrike')) AS providers(name, kind)
-WHERE NOT EXISTS (SELECT 1 FROM mcp_servers WHERE provider_kind = providers.kind)
-ON CONFLICT (name) DO NOTHING;
+-- Catalog-only provider templates are not seeded. Live toolchain MCP servers are
+-- ordinary configured rows (see the operator bootstrap); the catalog provider
+-- tier exists only for rows explicitly created with a provider_kind.
 
 CREATE TABLE IF NOT EXISTS mcp_tools_cache (
     id            BIGSERIAL PRIMARY KEY,

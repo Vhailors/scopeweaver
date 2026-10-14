@@ -65,16 +65,11 @@ FROM (SELECT id,name,transport,command,args,env,url,enabled,insecure,provider_ki
 		t.Logf("SQL %s: %s", label, rows)
 	}
 	snapshot("before")
-	t.Run("disabled_seeds_and_legacy_transports", func(t *testing.T) {
-		for name, kind := range map[string]string{"YeepForge": "yeepforge", "AdStrike": "adstrike"} {
-			m := find(name)
-			if m.ProviderKind != kind || m.Enabled || m.Command != "" || m.URL != "" || m.Insecure || m.SourceRevision != "" {
-				t.Fatalf("unsafe template: %+v", m)
-			}
-			bound, err := d.ResourceAgents("mcp", m.ID)
-			if err != nil || len(bound) != 0 {
-				t.Fatalf("template bindings=%v err=%v", bound, err)
-			}
+	t.Run("no_template_seeds_and_legacy_transports", func(t *testing.T) {
+		var kinds string
+		if err := d.QueryRow(`SELECT coalesce(string_agg(provider_kind, ',' ORDER BY provider_kind), '')
+FROM mcp_servers WHERE provider_kind <> ''`).Scan(&kinds); err != nil || kinds != "" {
+			t.Fatalf("schema seeded catalog templates: %q err=%v", kinds, err)
 		}
 		for _, transport := range []string{"stdio", "http", "sse"} {
 			m := find("legacy-" + transport)
@@ -83,6 +78,12 @@ FROM (SELECT id,name,transport,command,args,env,url,enabled,insecure,provider_ki
 			}
 		}
 	})
+	if _, err := d.SaveMCP(&MCPServer{Name: "YeepForge", Transport: "stdio", ProviderKind: "yeepforge"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.SaveMCP(&MCPServer{Name: "AdStrike", Transport: "stdio", ProviderKind: "adstrike"}); err != nil {
+		t.Fatal(err)
+	}
 	m := find("YeepForge")
 	t.Run("rename_update_restart", func(t *testing.T) {
 		m.Name = "Operator catalog"
