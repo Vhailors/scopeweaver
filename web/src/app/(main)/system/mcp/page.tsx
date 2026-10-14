@@ -628,7 +628,7 @@ export default function MCPPage() {
             className="hover:border-primary/60 cursor-pointer gap-3 transition hover:shadow-sm"
           >
             <CardHeader>
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <ServerIcon className="text-muted-foreground size-4 shrink-0" />
                 <CardTitle className="truncate text-base">{s.name}</CardTitle>
                 <Badge variant="outline" className="uppercase">
@@ -693,7 +693,7 @@ export default function MCPPage() {
                 <TabsTrigger value="config">{swt("interface.m1473")}</TabsTrigger>
                 <TabsTrigger value="tools">{toolsTabLabel()}</TabsTrigger>
               </TabsList>
-              <TabsContent value="config" className="min-h-0 flex-1 overflow-y-auto">
+              <TabsContent value="config" className="-mx-4 min-h-0 flex-1 overflow-y-auto px-4">
                 {renderForm()}
                 <div className="flex flex-col items-start gap-2 pt-2 pb-6">
                   <Button data-testid="mcp-save" onClick={saveForm} disabled={saving}>
