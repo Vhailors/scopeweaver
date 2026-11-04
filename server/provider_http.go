@@ -60,6 +60,33 @@ func (s *Server) serveProvider(w http.ResponseWriter, r *http.Request) {
 		providerUnavailable(w)
 		return
 	}
+	if parts[1] == "records" && len(parts) == 4 {
+		family := parts[2]
+		if family != "report" && family != "evidence" && family != "retest" {
+			writeErr(w, 404, "Detail family unavailable")
+			return
+		}
+		revision := r.URL.Query().Get("source_revision")
+		if len(revision) != 64 {
+			writeErr(w, 400, "Exact source revision required")
+			return
+		}
+		record, err := pg.ProviderDetail(ctx, g.CompanyID, family, parts[3], revision)
+		if errors.Is(err, sql.ErrNoRows) {
+			writeErr(w, 404, "Company detail unavailable")
+			return
+		}
+		if errors.Is(err, db.ErrProviderRevision) {
+			writeErr(w, 409, "Source changed; obtain a fresh snapshot")
+			return
+		}
+		if err != nil {
+			providerUnavailable(w)
+			return
+		}
+		writeJSON(w, 200, record)
+		return
+	}
 	if parts[1] == "publications" && len(parts) == 3 {
 		content, err := pg.ProviderPublication(ctx, company, parts[2])
 		if errors.Is(err, sql.ErrNoRows) {

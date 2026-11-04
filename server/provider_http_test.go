@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -78,10 +79,18 @@ func TestProviderCompanyContractPG(t *testing.T) {
 	a := id(`INSERT INTO companies(name,nkey) VALUES('Anonymized source A','provider-fixture-a') RETURNING id`)
 	b := id(`INSERT INTO companies(name,nkey) VALUES('Anonymized source B','provider-fixture-b') RETURNING id`)
 	assetIDs := []int64{}
+	var endpointID int64
 	for i, sample := range fixture.Assets {
 		aid := id(`INSERT INTO assets(type,company_id,domain,ip,bundle_id,url,method,port,status_code,content_length,extra) VALUES($1,$2,$3,$4,$5,$6,'GET',$7,$8,$9,'{"credential":"DO_NOT_EXPORT_SOURCE_CONTENT"}') RETURNING id`, sample["type"], a, fmt.Sprintf("asset-%d.fixture.invalid", i), fmt.Sprintf("192.0.2.%d", i+1), fmt.Sprintf("fixture.%d", i), fmt.Sprintf("https://asset-%d.fixture.invalid/path?token=DO_NOT_EXPORT_SOURCE_CONTENT", i), sample["port"], sample["status_code"], sample["content_length"])
 		assetIDs = append(assetIDs, aid)
+		if sample["type"] == "endpoint" {
+			endpointID = aid
+		}
 	}
+	// Controlled mutations of the anonymized source records exercise redaction
+	// and automatic metadata; these are not observations about production content.
+	endpointSourceURL := "HTTPS://fixture-user:DO_NOT_EXPORT_SOURCE_CONTENT@endpoint.fixture.invalid/path?token=DO_NOT_EXPORT_SOURCE_CONTENT#DO_NOT_EXPORT_SOURCE_CONTENT"
+	exec(`UPDATE assets SET url=$2,technologies=ARRAY['REDACTED source technology'],page_title='REDACTED source page',extra='{"description":"REDACTED source metadata","credential":"DO_NOT_EXPORT_SOURCE_CONTENT","unmapped":"DO_NOT_EXPORT_SOURCE_CONTENT"}',params=ARRAY['{"location":"query","name":"filter","type":"string","value":"DO_NOT_EXPORT_SOURCE_CONTENT"}'::jsonb],auth=ARRAY['{"type":"bearer","token":"DO_NOT_EXPORT_SOURCE_CONTENT"}'::jsonb] WHERE id=$1`, endpointID, endpointSourceURL)
 	foreign := id(`INSERT INTO assets(type,company_id,url) VALUES('endpoint',$1,'https://other.fixture.invalid/private') RETURNING id`, b)
 	unassigned := id(`INSERT INTO assets(type,url) VALUES('endpoint','https://unassigned.fixture.invalid/private') RETURNING id`)
 	_ = unassigned
@@ -108,6 +117,8 @@ func TestProviderCompanyContractPG(t *testing.T) {
 		findingIDs = append(findingIDs, fid)
 	}
 	ownFinding := findingIDs[0]
+	exec("UPDATE findings SET summary=$1,report=$2,evidence=$3 WHERE id=$4", "REDACTED source finding summary", "REDACTED source-held assessment report.\nAuthorization: Basic fixture-only\nDB_PASSWORD=short-demo\n```http\nGET /private HTTP/1.1\nCookie: DO_NOT_EXPORT_SOURCE_CONTENT\n```\nReference https://asset-1.fixture.invalid/v1/profile?token=DO_NOT_EXPORT_SOURCE_CONTENT", "REDACTED source-held evidence.\npassword=DO_NOT_EXPORT_SOURCE_CONTENT", ownFinding)
+	exec(`UPDATE exploration_nodes SET payload='{"text":"REDACTED source goal","credential":"DO_NOT_EXPORT_SOURCE_CONTENT","unmapped":"DO_NOT_EXPORT_SOURCE_CONTENT"}' WHERE id=$1`, goal)
 	orphan := id(`INSERT INTO findings(severity,status,asset_ids) VALUES('high','pending',$1) RETURNING id`, fmt.Sprintf("[%d]", assetIDs[1]))
 	badFinding := id(`INSERT INTO findings(task_id,severity,asset_ids) VALUES($1,'high',$2) RETURNING id`, task, fmt.Sprintf("[%d,%d]", assetIDs[0], foreign))
 	exec(`INSERT INTO findings(task_id,severity,asset_ids) VALUES($1,'high','[]')`, task)
@@ -284,6 +295,73 @@ func TestProviderCompanyContractPG(t *testing.T) {
 	if len(seen["asset"]) != 6 {
 		t.Fatal("all six source asset types must appear, without another company or later additions")
 	}
+	payloadOf := func(family, identity string) map[string]any {
+		t.Helper()
+		var payload map[string]any
+		if json.Unmarshal(seen[family][identity].Payload, &payload) != nil {
+			t.Fatal("automatic payload unavailable")
+		}
+		return payload
+	}
+	endpointPayload := payloadOf("asset", strconv.FormatInt(endpointID, 10))
+	parsedURL, err := url.Parse(endpointPayload["url"].(string))
+	expectedURL, _ := url.Parse(endpointSourceURL)
+	if err != nil || parsedURL.Scheme != "https" || parsedURL.Path != expectedURL.Path || parsedURL.Hostname() != expectedURL.Hostname() || parsedURL.User != nil || parsedURL.Fragment != "" || parsedURL.Query().Get("token") != "[redacted]" {
+		t.Fatal("automatic URL lost its identity or retained credentials, query values or fragments")
+	}
+	if _, exists := endpointPayload["auth"]; exists {
+		t.Fatal("authentication values entered automatic metadata")
+	}
+	if endpointPayload["authentication_present"] != true {
+		t.Fatal("safe authentication presence metadata was lost")
+	}
+	if endpointPayload["page_title"] != "REDACTED source page" || len(endpointPayload["technologies"].([]any)) == 0 {
+		t.Fatal("useful asset metadata still needs publication")
+	}
+	extra := endpointPayload["extra"].(map[string]any)
+	if extra["description"] != "REDACTED source metadata" || extra["credential"] != nil || extra["unmapped"] != nil {
+		t.Fatal("automatic metadata allowlist did not preserve safe fields and remove unsupported content")
+	}
+	param := endpointPayload["params"].([]any)[0].(map[string]any)
+	if param["name"] != "filter" || param["value"] != nil {
+		t.Fatal("parameter metadata or value exclusion failed")
+	}
+	if payloadOf("company", strconv.FormatInt(a, 10))["name"] != "Anonymized source A" || payloadOf("task", strconv.FormatInt(task, 10))["description"] != "REDACTED source description" {
+		t.Fatal("company/task labels still require publication")
+	}
+	if payloadOf("goal", strconv.FormatInt(goal, 10))["research"].(map[string]any)["text"] != "REDACTED source goal" {
+		t.Fatal("automatic research text unavailable")
+	}
+	if payloadOf("finding", strconv.FormatInt(ownFinding, 10))["summary"] != "REDACTED source finding summary" {
+		t.Fatal("automatic finding summary unavailable")
+	}
+	if id(`SELECT count(*) FROM provider_publications`) != 0 {
+		t.Fatal("automatic coverage must be proven before any publication")
+	}
+	reportMetadata := payloadOf("report", strconv.FormatInt(ownFinding, 10))
+	if reportMetadata["body"] != nil || reportMetadata["detail_available"] != true {
+		t.Fatal("report originals must stay source-held behind automatic detail reads")
+	}
+	automaticRevision := reportMetadata["source_revision"].(string)
+	detailPath := fmt.Sprintf("/api/provider/v1/companies/%d/records/report/%d", a, ownFinding)
+	automaticDetail := do("GET", detailPath+"?source_revision="+automaticRevision, token, nil)
+	expect(automaticDetail, 200)
+	var detailRecord db.ProviderRecord
+	if json.Unmarshal(automaticDetail.Body, &detailRecord) != nil || detailRecord.Company != a || detailRecord.Source != first.Manifest.Source || detailRecord.Schema != db.ProviderSchema {
+		t.Fatal("automatic detail envelope is incomplete")
+	}
+	detailCanonical, err := db.ProviderCanonicalJSON(detailRecord.Payload)
+	if err != nil || detailRecord.Checksum != db.ProviderChecksum(detailCanonical) || detailRecord.Revision != detailRecord.Checksum || detailRecord.ObservedAt.IsZero() || detailRecord.Family != "report" || detailRecord.ID != strconv.FormatInt(ownFinding, 10) {
+		t.Fatal("automatic detail identity or payload integrity failed")
+	}
+	var detailPayload map[string]any
+	_ = json.Unmarshal(detailRecord.Payload, &detailPayload)
+	body := detailPayload["body"].(string)
+	if !strings.Contains(body, "REDACTED source-held assessment report.") || strings.Contains(body, "GET /private") || strings.Contains(body, "fixture-only") || strings.Contains(body, "short-demo") || detailPayload["content_checksum"] != db.ProviderChecksum([]byte(body)) {
+		t.Fatal("redacted report content or integrity is incorrect")
+	}
+	expect(do("GET", detailPath, token, nil), 400)
+	expect(do("GET", detailPath+"?source_revision="+strings.Repeat("0", 64), token, nil), 409)
 	for i, f := range fixture.Findings {
 		var data map[string]any
 		_ = json.Unmarshal(seen["finding"][strconv.FormatInt(findingIDs[i], 10)].Payload, &data)
@@ -316,6 +394,8 @@ func TestProviderCompanyContractPG(t *testing.T) {
 	expect(do("GET", path+"?cursor="+freshCursor, token, nil), 200)
 	expect(do("GET", otherPath, token, nil), 403)
 	expect(do("GET", path, other, nil), 403)
+	expect(do("GET", detailPath+"?source_revision="+automaticRevision, other, nil), 403)
+	expect(do("GET", fmt.Sprintf("/api/provider/v1/companies/%d/records/report/%d?source_revision=%s", b, ownFinding, automaticRevision), other, nil), 404)
 	expect(do("GET", path, admin, nil), 401)
 	expect(do("GET", "/api/tasks", token, nil), 401)
 	expect(do("POST", "/api/tasks", token, map[string]any{}), 401)
@@ -367,6 +447,7 @@ func TestProviderCompanyContractPG(t *testing.T) {
 	c, _ := json.Marshal(providerCursor{Snapshot: approvedSnapshot.ID, Offset: 0})
 	approvedCursor = base64.RawURLEncoding.EncodeToString(c)
 	exec(`UPDATE findings SET report='Changed REDACTED source-held report' WHERE id=$1`, ownFinding)
+	expect(do("GET", detailPath+"?source_revision="+automaticRevision, token, nil), 409)
 	expect(do("GET", publicationPath, token, nil), 404)
 	expect(do("GET", path+"?cursor="+approvedCursor, token, nil), 410)
 	expect(do("POST", "/api/provider-publications", admin, request), 409)
@@ -410,7 +491,7 @@ func TestProviderCompanyContractPG(t *testing.T) {
 	token3, grant3 := grant(a)
 	expect(do("DELETE", "/api/provider-grants/"+grant3, admin, nil), 200)
 	expect(do("GET", path, token3, nil), 403)
-	t.Log("Verified real HTTP/PostgreSQL: all six asset types; every seeded assessment family; original dispositions; source-held report approvals; company, expiry and read-only refusals; immutable paging and duplicate/restart replay; update/removal markers; atomic rollback. No production credentials, scans or model calls.")
+	t.Log("Verified real HTTP/PostgreSQL: automatic identifiers, redacted URLs, metadata, assessment text and revision-pinned source-held reports without publication; all six asset types; original dispositions; optional reviewed artifacts; company, expiry and read-only refusals; immutable paging and duplicate/restart replay; update/removal markers; atomic rollback. No production credentials, scans or model calls.")
 }
 
 // Only isolated fixture responses are recorded; credentials and query values are

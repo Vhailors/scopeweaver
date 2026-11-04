@@ -19,6 +19,7 @@ const ProviderSchema = "scopeweaver.assessment.v1"
 
 var ErrProviderAccess = errors.New("provider access denied")
 var ErrProviderCursor = errors.New("provider snapshot unavailable")
+var ErrProviderRevision = errors.New("source revision changed")
 
 func ProviderChecksum(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
 
@@ -52,7 +53,7 @@ func (d *DB) CreateProviderGrant(ctx context.Context, company int64, ttl time.Du
 		return g, "", err
 	}
 	token := "swp_" + hex.EncodeToString(b)
-	_, err := d.ExecContext(ctx, `INSERT INTO provider_grants(id,company_id,token_hash,expires_at) VALUES($1,$2,$3,$4)`, g.ID, company, ProviderChecksum([]byte(token)), g.ExpiresAt)
+	_, err := d.ExecContext(ctx, `WITH initialize AS (INSERT INTO provider_instance(singleton,id) VALUES(true,$5) ON CONFLICT DO NOTHING) INSERT INTO provider_grants(id,company_id,token_hash,expires_at) VALUES($1,$2,$3,$4)`, g.ID, company, ProviderChecksum([]byte(token)), g.ExpiresAt, uuid.NewString())
 	return g, token, err
 }
 func (d *DB) ProviderGrant(ctx context.Context, token string, company int64) (ProviderGrant, error) {
@@ -123,8 +124,9 @@ func (d *DB) CreateProviderSnapshot(ctx context.Context, g ProviderGrant, limit 
 		return out, err
 	}
 	m := ProviderManifest{Schema: ProviderSchema, Source: source, Company: g.CompanyID, ObservedAt: observed, Counts: map[string]int{}, Rejected: map[string]int{}, Absence: "replace_only_after_complete_snapshot_without_rejections", Gaps: []string{
-		"Free text, arbitrary JSON, URLs and executable content require explicit reviewed redacted publications; originals never leave the source.",
-		"Reports and evidence expose versions, integrity references and approved redacted publications only; absent or stale approval is not an empty report.",
+		"Structured identifiers, scope values, metadata and assessment text are automatic under the declared redaction policy; removed or unsupported fields carry explicit notices.",
+		"Report/evidence bodies remain source-held and are available automatically through revision-pinned redacted detail reads. Credentials, code/traffic blocks, authentication values and parameter values are excluded.",
+
 		"Unattributed records are not broadcast. Company-associated conflicts are rejected with identities but no source content.",
 		"Cold archive contents and filesystem artifacts have no company-safe approval mapping; use explicit publications after review.",
 		"Coverage exports source scopes, anchors and links, not an independently recomputed coverage score.",
@@ -146,7 +148,7 @@ func (d *DB) CreateProviderSnapshot(ctx context.Context, g ProviderGrant, limit 
 			return out, err
 		}
 		// Canonical Go JSON ensures stable content revisions independent of JSONB formatting.
-		payload, err = ProviderCanonicalJSON(payload)
+		payload, err = ProviderPayload(family, payload, false)
 		if err != nil {
 			rows.Close()
 			return out, err
@@ -231,4 +233,31 @@ func (d *DB) ProviderSnapshotPage(ctx context.Context, g ProviderGrant, id strin
 	}
 	err = json.Unmarshal(records, &out.Records)
 	return out, total, err
+}
+
+// ProviderDetail returns the current eligible source version, never an unpinned
+// body or a reconstructed historical report. Originals remain in source storage.
+func (d *DB) ProviderDetail(ctx context.Context, company int64, family, id, revision string) (ProviderRecord, error) {
+	var out ProviderRecord
+	var raw []byte
+	var source string
+	var observed time.Time
+	err := d.QueryRowContext(ctx, `SELECT q.payload,i.id,statement_timestamp() FROM (`+providerRecordsSQL+`) q CROSS JOIN provider_instance i WHERE i.singleton AND q.family=$2 AND q.id=$3 AND NOT q.deleted`, company, family, id).Scan(&raw, &source, &observed)
+	if err != nil {
+		return out, err
+	}
+	var p map[string]any
+	if err = json.Unmarshal(raw, &p); err != nil {
+		return out, err
+	}
+	if revision == "" || p["source_revision"] != revision {
+		return out, ErrProviderRevision
+	}
+	safe, err := ProviderPayload(family, raw, true)
+	if err != nil {
+		return out, err
+	}
+	sum := ProviderChecksum(safe)
+	out = ProviderRecord{Schema: ProviderSchema, Source: source, Company: company, Family: family, ID: id, Revision: sum, Checksum: sum, ObservedAt: observed, Payload: safe}
+	return out, nil
 }
