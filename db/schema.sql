@@ -1384,3 +1384,28 @@ CREATE INDEX IF NOT EXISTS idx_notification_deliveries_batch
     ON notification_deliveries(batch_id) WHERE batch_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_notification_deliveries_channel
     ON notification_deliveries(channel_id, id DESC);
+
+-- Versioned assessment provider. Source assessment tables remain authoritative.
+CREATE TABLE IF NOT EXISTS provider_instance (
+ singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton), id TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS provider_grants (
+ id TEXT PRIMARY KEY, company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+ token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, revoked_at TIMESTAMPTZ,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS provider_snapshots (
+ id TEXT PRIMARY KEY, grant_id TEXT NOT NULL REFERENCES provider_grants(id) ON DELETE CASCADE,
+ company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+ observed_at TIMESTAMPTZ NOT NULL, expires_at TIMESTAMPTZ NOT NULL,
+ page_size INTEGER NOT NULL CHECK (page_size BETWEEN 1 AND 500),
+ manifest JSONB NOT NULL, records JSONB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_provider_snapshots_expiry ON provider_snapshots(expires_at);
+-- Explicitly reviewed, redacted copies only. Never serve workspace files or traffic blobs.
+CREATE TABLE IF NOT EXISTS provider_publications (
+ id TEXT PRIMARY KEY, company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+ family TEXT NOT NULL, record_id TEXT NOT NULL, source_revision TEXT NOT NULL,
+ content JSONB NOT NULL, checksum TEXT NOT NULL, approved_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ withdrawn_at TIMESTAMPTZ
+);

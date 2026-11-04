@@ -660,6 +660,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/auth/change-password", s.authChangePassword)
 
 	mux.HandleFunc("GET /api/health", s.health)
+	mux.HandleFunc("POST /api/provider-grants", s.providerCreateGrant)
+	mux.HandleFunc("DELETE /api/provider-grants/{id}", s.providerRevokeGrant)
+	mux.HandleFunc("POST /api/provider-publications", s.providerApprovePublication)
+	mux.HandleFunc("DELETE /api/provider-publications/{id}", s.providerWithdrawPublication)
 	mux.HandleFunc("GET /api/stats", s.stats)
 	mux.HandleFunc("GET /api/logs", s.getLogs)
 	mux.HandleFunc("GET /api/logs/history", s.getLogsHistory)

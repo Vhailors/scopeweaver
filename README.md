@@ -345,6 +345,7 @@ Demo mode only produces clearly labeled simulated records and does not touch rea
 - Backend: `go run ./cmd/artex` (without `-tags embedui` the frontend is not embedded)
 - Frontend: `cd web && npm run dev` (`/api` is reverse-proxied to the backend, with hot reload)
 - Tests: `go test ./...`
+- Company-scoped read-only assessment provider: [contract, coverage limits and isolated validation](docs/provider-contract.md). This does not activate or replace the existing native connector.
 - Mock preview (no backend): `cd web && NEXT_PUBLIC_MOCK=1 npm run dev`
 
 ---
