@@ -50,6 +50,33 @@ The manifest includes counts for every known family, reason-counted rejections, 
 
 Soft-deleted tasks/nodes carry `deleted=true`. Hard deletions use complete-snapshot absence, not an invented historical deletion stream. Reconcile absence **only after all pages complete without rejected records**. A partial read, failed read, expired cursor or rejected record must never cause destination deletion. Record/progress commits on the destination must use one destination transaction per page; that consumer implementation belongs to the next piece, as do duplicate upserts that preserve analyst-owned fields and never create attack alerts.
 
+## Composite record identities
+
+The `research_edge`, `coverage_anchor`, `lineage` and `task_asset` families use
+`pc1_` followed by a lowercase SHA-256 digest. The digest input is PostgreSQL's
+UTF-8 JSONB array text containing the family name followed by the native typed
+primary-key components, in primary-key order (`research_edge` uses exploration,
+source node, relationship, destination node). Array encoding preserves component
+boundaries; the family name separates domains. Identity uses original keys, not
+redacted labels or mutable payload fields. Non-key updates keep the identity;
+changing a key is a removal plus a new record. SHA-256 makes keys opaque in the
+feed, not encrypted or resistant to guessing low-entropy labels.
+
+Relationship labels remain subject to payload redaction. The current source
+schema only permits its declared relationship enum; the identifier boundary also
+protects against legacy data or constraint drift without relaxing that schema.
+
+This replaces earlier colon-joined composite identities. Persisted snapshots
+containing any old composite identity return 410 on **every** page, including
+pages without that family; restart with a fresh snapshot rather than rewriting
+an immutable observation. New snapshots and source lookups use the same opaque
+identities. Native single-column IDs and payload endpoint references are unchanged.
+Consumers must treat IDs as opaque and may reconcile old composite records only
+after a new complete snapshot without rejections, using the existing absence
+policy. Previously exported identities cannot be recalled. No production cache
+or destination migration is performed by this source change; review existing
+consumer state before activation.
+
 ## Attribution and family coverage
 
 Tasks need one consistent company across direct company and company-scope links; links to foreign/unassigned assets reject the task. Findings need every asset link to resolve to the authorized company and no conflicting task attribution. Asset-only attribution is allowed only when there is no task and all links agree; task-only attribution requires an eligible task. Malformed links and unsupported severity/disposition values are rejected, never silently normalized or assigned to every company.
@@ -87,4 +114,10 @@ Run the existing package gate exactly as CI, with a separate initialized disposa
 
 The test uses minimized existing-source readings, anonymized identities, and labelled controlled redaction/ownership mutations. Through real HTTP/PostgreSQL it verifies automatic metadata and bodies before any publication, retained URL paths without credentials/query values, supported metadata without auth/parameter values, report version pins, original dispositions, company/expiry/read-only refusals, replay through a fresh manager, updates/removals and rollback. Reconcile deletion against actual stored and exported counts rather than a guessed total.
 
-Then run the adapter transport gate, frontend tests/static build, embedded build, ten consecutive journeys without retries, a company-enforcement negative control, and a redaction-bypass negative control. Both must fail through the real interface at their intended assertions; restore the implementation and verify positive controls. Sanitized responses, outcomes and commands remain uncommitted under this isolated ScopeWeaver working copy's `evidence/provider-scr93/automatic` folder. Do not edit the deployed checkout or production credentials.
+The SCR-107 regression also verifies all four opaque composite families, distinct
+identities for labels that redact identically, stable identities under non-key
+updates, source-record lookups and refusal of legacy cached IDs on every page.
+It first proves the current schema rejects credential-pattern labels, then models
+constraint drift only inside the disposable fixture and restores enforcement.
+
+Then run the adapter transport gate, frontend tests/static build, embedded build, ten consecutive journeys without retries, a company-enforcement negative control, and a redaction-bypass negative control. Both must fail through the real interface at their intended assertions; restore the implementation and verify positive controls. Keep sanitized responses, outcomes and commands outside the working copy in the task evidence folder. Earlier SCR-93 evidence remains in its recorded location. Do not edit the deployed checkout or production credentials.

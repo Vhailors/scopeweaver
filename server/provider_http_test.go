@@ -3,8 +3,11 @@ package server
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +21,7 @@ import (
 
 	"github.com/Autumn-27/artex/db"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Intent: SCR-93 / accepted SCR-92 direction A. Exercise provider company
@@ -108,6 +112,32 @@ func TestProviderCompanyContractPG(t *testing.T) {
 	goal := id(`INSERT INTO exploration_nodes(exploration_id,kind,state,payload) VALUES($1,'goal','open','{"text":"DO_NOT_EXPORT_SOURCE_CONTENT"}') RETURNING id`, exp)
 	node := id(`INSERT INTO exploration_nodes(exploration_id,kind,state) VALUES($1,'fact','confirmed') RETURNING id`, exp)
 	exec(`INSERT INTO exploration_edges(exploration_id,src_id,rel,dst_id) VALUES($1,$2,'proves',$3)`, exp, node, goal)
+	// Intent: SCR-107 requires opaque composite identities even for credential-pattern
+	// relationship text. Current schema rejects such labels; model legacy constraint
+	// drift only in this disposable database, then immediately restore enforcement.
+	credentialRelations := []string{"password=scr107-pass-a", "password=scr107-pass-b", "Authorization: Bearer scr107-header"}
+	_, err = m.pg.Exec(`INSERT INTO exploration_edges(exploration_id,src_id,rel,dst_id) VALUES($1,$2,$3,$4)`, exp, node, credentialRelations[0], goal)
+	var checkError *pgconn.PgError
+	if !errors.As(err, &checkError) || checkError.Code != "23514" {
+		t.Fatal("current schema must reject credential-pattern relationship labels")
+	}
+	var relationCheck string
+	if err = m.pg.QueryRow(`SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='exploration_edges'::regclass AND conname='ck_edge_rel'`).Scan(&relationCheck); err != nil {
+		t.Fatal("relationship constraint definition unavailable")
+	}
+	exec(`ALTER TABLE exploration_edges DROP CONSTRAINT ck_edge_rel`)
+	for _, relation := range credentialRelations {
+		exec(`INSERT INTO exploration_edges(exploration_id,src_id,rel,dst_id) VALUES($1,$2,$3,$4)`, exp, node, relation, goal)
+	}
+	exec(`ALTER TABLE exploration_edges ADD CONSTRAINT ck_edge_rel ` + relationCheck + ` NOT VALID`)
+	defer func() {
+		if _, e := m.pg.Exec(`DELETE FROM exploration_edges WHERE rel=ANY($1)`, credentialRelations); e != nil {
+			t.Error("controlled relationship fixture cleanup failed")
+		}
+		if _, e := m.pg.Exec(`ALTER TABLE exploration_edges VALIDATE CONSTRAINT ck_edge_rel`); e != nil {
+			t.Error("relationship constraint restoration failed")
+		}
+	}()
 	exec(`INSERT INTO exploration_anchors(node_id,asset_id) VALUES($1,$2)`, node, assetIDs[0])
 	exec(`INSERT INTO task_constraints(exploration_id,kind,text) VALUES($1,'deny','DO_NOT_EXPORT_SOURCE_CONTENT')`, exp)
 	exec(`INSERT INTO activity(exploration_id,node_id,kind,summary,detail,metadata) VALUES($1,$2,'tool_result','DO_NOT_EXPORT_SOURCE_CONTENT','DO_NOT_EXPORT_SOURCE_CONTENT','{"secret":"DO_NOT_EXPORT_SOURCE_CONTENT"}')`, exp, node)
@@ -177,6 +207,11 @@ func TestProviderCompanyContractPG(t *testing.T) {
 		}
 		if bytes.Contains(data, []byte("DO_NOT_EXPORT_SOURCE_CONTENT")) {
 			t.Fatal("source content escaped provider redaction boundary")
+		}
+		for _, value := range []string{"scr107-pass-a", "scr107-pass-b", "scr107-header"} {
+			if bytes.Contains(data, []byte(value)) {
+				t.Fatal("credential-pattern relationship escaped provider envelope")
+			}
 		}
 		if os.Getenv("SCOPEWEAVER_PROVIDER_EVIDENCE") != "" {
 			decoder := json.NewDecoder(bytes.NewReader(data))
@@ -292,6 +327,48 @@ func TestProviderCompanyContractPG(t *testing.T) {
 			t.Fatalf("missing family %s", family)
 		}
 	}
+	compositeFamilies := []string{"research_edge", "coverage_anchor", "lineage", "task_asset"}
+	for _, family := range compositeFamilies {
+		for identity := range seen[family] {
+			if !strings.HasPrefix(identity, "pc1_") || len(identity) != len("pc1_")+sha256.Size*2 {
+				t.Fatal("composite provider identity is not an opaque digest")
+			}
+			if _, e := hex.DecodeString(strings.TrimPrefix(identity, "pc1_")); e != nil {
+				t.Fatal("composite provider identity has invalid digest encoding")
+			}
+			if _, e := m.pg.ProviderSourceRecord(ctx, a, family, identity); e != nil {
+				t.Fatal("snapshot composite identity does not resolve at its source")
+			}
+		}
+	}
+	// Different raw keys must remain distinct even when their payload labels redact
+	// to the same text. Keep the normal relation useful to the graph reader.
+	if len(seen["research_edge"]) != len(credentialRelations)+1 {
+		t.Fatal("redacted relationship labels collapsed distinct source identities")
+	}
+	relationIDs := map[string]string{}
+	for identity, edge := range seen["research_edge"] {
+		var payload struct {
+			Rel string `json:"rel"`
+		}
+		if json.Unmarshal(edge.Payload, &payload) != nil {
+			t.Fatal("relationship payload unavailable")
+		}
+		relationIDs[identity] = payload.Rel
+	}
+	var normalEdge string
+	redactedAssignments := 0
+	for identity, relation := range relationIDs {
+		if relation == "proves" {
+			normalEdge = identity
+		}
+		if relation == "password=[redacted]" {
+			redactedAssignments++
+		}
+	}
+	if normalEdge == "" || redactedAssignments != 2 {
+		t.Fatal("relationship payload redaction lost safe labels or retained assignments")
+	}
 	if len(seen["asset"]) != 6 {
 		t.Fatal("all six source asset types must appear, without another company or later additions")
 	}
@@ -381,7 +458,61 @@ func TestProviderCompanyContractPG(t *testing.T) {
 	if first.Manifest.Rejected["ambiguous_company_attribution"] < 2 || len(first.Manifest.Gaps) == 0 {
 		t.Fatal("omissions must be visible")
 	}
+	// Non-key edits change content revisions, not identities. This fresh snapshot
+	// also proves stability across the new manager used during restart replay.
+	exec(`UPDATE exploration_edges SET created_at=created_at+interval '1 second' WHERE exploration_id=$1 AND src_id=$2 AND rel='proves' AND dst_id=$3`, exp, node, goal)
+	exec(`UPDATE task_asset_links SET source_summary='Updated source summary' WHERE task_id=$1 AND asset_id=$2`, task, assetIDs[0])
 	fresh := parse(do("GET", path+"?limit=500", token, nil))
+	for _, family := range compositeFamilies {
+		count := 0
+		for _, record := range fresh.Records {
+			if record.Family != family {
+				continue
+			}
+			count++
+			if _, ok := seen[family][record.ID]; !ok {
+				t.Fatal("non-key edit changed composite identity")
+			}
+			if family == "research_edge" && record.ID == normalEdge && record.Revision == seen[family][record.ID].Revision {
+				t.Fatal("relationship content edit did not change revision")
+			}
+		}
+		if count != len(seen[family]) {
+			t.Fatal("fresh snapshot lost composite records")
+		}
+	}
+	// Legacy persisted pages must fail closed before returning ANY page, including
+	// one whose records precede the affected family. Never rewrite a pinned page.
+	for _, family := range compositeFamilies {
+		legacy := parse(do("GET", path+"?limit=2", token, nil))
+		legacyIdentity := fmt.Sprintf("%d:%d:%s:%d", exp, node, credentialRelations[0], goal)
+		exec(`UPDATE provider_snapshots SET records=(SELECT jsonb_agg(CASE WHEN r->>'family'=$3 THEN jsonb_set(r,'{record_id}',to_jsonb($2::text)) ELSE r END ORDER BY ord) FROM jsonb_array_elements(records) WITH ORDINALITY e(r,ord)) WHERE id=$1`, legacy.ID, legacyIdentity, family)
+		expect(do("GET", path+"?cursor="+legacy.Next, token, nil), 410)
+		zero, _ := json.Marshal(providerCursor{Snapshot: legacy.ID, Offset: 0})
+		expect(do("GET", path+"?cursor="+base64.RawURLEncoding.EncodeToString(zero), token, nil), 410)
+	}
+	// Primary-key removal is absence in the next complete snapshot; restoring the
+	// same source key recovers the same opaque ID, not a new random identifier.
+	exec(`DELETE FROM exploration_edges WHERE exploration_id=$1 AND src_id=$2 AND rel='proves' AND dst_id=$3`, exp, node, goal)
+	withoutEdge := parse(do("GET", path+"?limit=500", token, nil))
+	for _, record := range withoutEdge.Records {
+		if record.Family == "research_edge" && record.ID == normalEdge {
+			t.Fatal("removed composite key remains in fresh snapshot")
+		}
+	}
+	exec(`INSERT INTO exploration_edges(exploration_id,src_id,rel,dst_id) VALUES($1,$2,'proves',$3)`, exp, node, goal)
+	restoredEdge := parse(do("GET", path+"?limit=500", token, nil))
+	foundEdge := false
+	for _, record := range restoredEdge.Records {
+		if record.Family == "research_edge" && record.ID == normalEdge {
+			foundEdge = true
+		}
+	}
+	if !foundEdge {
+		t.Fatal("restoring a source key changed its composite identity")
+	}
+	transcript = append(transcript, map[string]any{"check": "SCR-107 opaque composite identities", "families": compositeFamilies, "distinct_relationships": len(seen["research_edge"]), "same_redacted_label_distinct_identities": redactedAssignments, "source_lookup": "passed", "non_key_update_stability": "passed", "removal_and_restoration": "passed", "legacy_cursor_refusal": "410 for each family, including offset zero", "schema_constraint": "credential label rejected before controlled legacy fixture"})
+
 	if fresh.Manifest.Checksum == first.Manifest.Checksum || fresh.Total <= first.Total {
 		t.Fatal("fresh cycle missed updates/additions")
 	}

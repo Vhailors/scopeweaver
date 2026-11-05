@@ -8,6 +8,10 @@ import (
 // Explicit projections: never to_jsonb(row) in exported payloads. Raw source rows
 // are used only for opaque revision hashes inside PostgreSQL. All relationship
 // endpoints must belong to the authorized company's eligible set.
+// Composite identities hash a domain-separated, typed JSONB array of primary-key
+// components. Never concatenate raw text into envelope IDs or hash redacted text:
+// different source keys may have the same redacted payload. Non-key edits must
+// not change identity. pc1_ versions this encoding independently of payload policy.
 const providerRecordsSQL = `
 WITH task_companies AS (
  SELECT id AS task_id,company_id FROM tasks WHERE company_id IS NOT NULL
@@ -57,13 +61,13 @@ WITH task_companies AS (
  UNION ALL
  SELECT 'constraint',c.id::text,jsonb_build_object('source_revision',encode(sha256(convert_to(to_jsonb(c)::text,'UTF8')),'hex'),'exploration_id',c.exploration_id,'kind',c.kind,'created_at',c.created_at,'updated_at',c.updated_at,'text',c.text,'origin',c.origin),false FROM task_constraints c JOIN own_tasks t ON t.exploration_id=c.exploration_id
  UNION ALL
- SELECT 'research_edge',e.exploration_id||':'||e.src_id||':'||e.rel||':'||e.dst_id,jsonb_build_object('exploration_id',e.exploration_id,'src_id',e.src_id,'rel',e.rel,'dst_id',e.dst_id,'created_at',e.created_at),false FROM exploration_edges e JOIN own_nodes src ON src.id=e.src_id JOIN own_nodes dst ON dst.id=e.dst_id
+ SELECT 'research_edge','pc1_'||encode(sha256(convert_to(jsonb_build_array('research_edge',e.exploration_id,e.src_id,e.rel,e.dst_id)::text,'UTF8')),'hex'),jsonb_build_object('exploration_id',e.exploration_id,'src_id',e.src_id,'rel',e.rel,'dst_id',e.dst_id,'created_at',e.created_at),false FROM exploration_edges e JOIN own_nodes src ON src.id=e.src_id JOIN own_nodes dst ON dst.id=e.dst_id
  UNION ALL
- SELECT 'coverage_anchor',a.node_id||':'||a.asset_id,jsonb_build_object('node_id',a.node_id,'asset_id',a.asset_id),false FROM exploration_anchors a JOIN own_nodes n ON n.id=a.node_id JOIN own_assets s ON s.id=a.asset_id
+ SELECT 'coverage_anchor','pc1_'||encode(sha256(convert_to(jsonb_build_array('coverage_anchor',a.node_id,a.asset_id)::text,'UTF8')),'hex'),jsonb_build_object('node_id',a.node_id,'asset_id',a.asset_id),false FROM exploration_anchors a JOIN own_nodes n ON n.id=a.node_id JOIN own_assets s ON s.id=a.asset_id
  UNION ALL
- SELECT 'lineage',l.task_id||':'||l.source_task_id,jsonb_build_object('task_id',l.task_id,'source_task_id',l.source_task_id,'created_at',l.created_at),false FROM task_relations l JOIN own_tasks t ON t.id=l.task_id JOIN own_tasks src ON src.id=l.source_task_id
+ SELECT 'lineage','pc1_'||encode(sha256(convert_to(jsonb_build_array('lineage',l.task_id,l.source_task_id)::text,'UTF8')),'hex'),jsonb_build_object('task_id',l.task_id,'source_task_id',l.source_task_id,'created_at',l.created_at),false FROM task_relations l JOIN own_tasks t ON t.id=l.task_id JOIN own_tasks src ON src.id=l.source_task_id
  UNION ALL
- SELECT 'task_asset',l.task_id||':'||l.asset_id,jsonb_build_object('task_id',l.task_id,'asset_id',l.asset_id,'source_node_id',CASE WHEN EXISTS(SELECT 1 FROM own_nodes n WHERE n.id=l.source_node_id) THEN l.source_node_id END,'created_at',l.created_at,'updated_at',l.updated_at,'source_summary',l.source_summary),false FROM task_asset_links l JOIN own_tasks t ON t.id=l.task_id JOIN own_assets a ON a.id=l.asset_id
+ SELECT 'task_asset','pc1_'||encode(sha256(convert_to(jsonb_build_array('task_asset',l.task_id,l.asset_id)::text,'UTF8')),'hex'),jsonb_build_object('task_id',l.task_id,'asset_id',l.asset_id,'source_node_id',CASE WHEN EXISTS(SELECT 1 FROM own_nodes n WHERE n.id=l.source_node_id) THEN l.source_node_id END,'created_at',l.created_at,'updated_at',l.updated_at,'source_summary',l.source_summary),false FROM task_asset_links l JOIN own_tasks t ON t.id=l.task_id JOIN own_assets a ON a.id=l.asset_id
  UNION ALL
  SELECT 'activity',a.id::text,jsonb_build_object('exploration_id',a.exploration_id,'node_id',CASE WHEN EXISTS(SELECT 1 FROM own_nodes n WHERE n.id=a.node_id) THEN a.node_id END,'is_error',a.is_error,'created_at',a.created_at,'kind',a.kind,'tool',a.tool,'summary',a.summary,'field_exclusions',jsonb_build_array('tool_inputs_outputs_metadata_and_transcripts')),false FROM activity a JOIN own_tasks t ON t.exploration_id=a.exploration_id
  UNION ALL

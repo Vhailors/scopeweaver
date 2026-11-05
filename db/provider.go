@@ -210,6 +210,13 @@ func (d *DB) ProviderSnapshotPage(ctx context.Context, g ProviderGrant, id strin
 	var manifest, records []byte
 	var total int
 	err := d.QueryRowContext(ctx, `WITH current_records AS (`+providerRecordsSQL+`) SELECT s.page_size,s.manifest,jsonb_array_length(s.records),COALESCE((SELECT jsonb_agg(e.value ORDER BY e.ordinality) FROM jsonb_array_elements(s.records) WITH ORDINALITY e WHERE e.ordinality>$4 AND e.ordinality<=$4+s.page_size),'[]'::jsonb) FROM provider_snapshots s JOIN provider_grants g ON g.id=s.grant_id WHERE s.id=$2 AND s.grant_id=$3 AND s.company_id=$1 AND s.expires_at>now() AND g.revoked_at IS NULL AND g.expires_at>now()
+ -- Older persisted snapshots may still contain raw composite keys. Refuse the
+ -- entire snapshot, not just an affected page, instead of rewriting pinned data.
+ AND NOT EXISTS (
+  SELECT 1 FROM jsonb_array_elements(s.records) old
+  WHERE old->>'family' IN ('research_edge','coverage_anchor','lineage','task_asset')
+  AND COALESCE(old->>'record_id','') !~ '^pc1_[0-9a-f]{64}$'
+ )
  AND NOT EXISTS (
   SELECT 1 FROM jsonb_array_elements(s.records) old
   WHERE (
