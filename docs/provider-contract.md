@@ -121,3 +121,26 @@ It first proves the current schema rejects credential-pattern labels, then model
 constraint drift only inside the disposable fixture and restores enforcement.
 
 Then run the adapter transport gate, frontend tests/static build, embedded build, ten consecutive journeys without retries, a company-enforcement negative control, and a redaction-bypass negative control. Both must fail through the real interface at their intended assertions; restore the implementation and verify positive controls. Keep sanitized responses, outcomes and commands outside the working copy in the task evidence folder. Earlier SCR-93 evidence remains in its recorded location. Do not edit the deployed checkout or production credentials.
+
+## Actual paired application verification
+
+The guarded server launchers `TestSCR95PairedApplications` and
+`TestSCR95ProviderUpgrade` drive AiSOC's separate opt-in
+`tests/integration/scopeweaver_pair` harness. They require an explicitly disposable
+provider database, private fixture directory, approved minimized readings and
+prepared application runners. No test enables production or calls a model.
+
+The paired profile covers two authenticated company workspaces, same-observable
+isolation, all six asset types, endpoint path/method identity, current and historical
+readers, pinned redacted detail, atomic/resumable pagination, real source changes,
+expired access/cursors and preserved analyst decisions. Its separate real-time
+probe measures a recurring five-minute schedule under labelled controlled load;
+it is not a production-volume or production-redaction claim.
+
+The upgrade profile preserves a genuine old snapshot and interrupted destination
+state before starting the merged opaque-ID implementation. HTTP 410 must retire
+staging without publishing or deleting data; only a complete fresh snapshot may
+retire old identities. Native inventory, historical observations and analyst-owned
+fields remain. Consult the AiSOC rollout procedure before any actual deployment,
+production credential use or company activation. Keep existing local source edits
+and every Tailscale Serve route unchanged.
