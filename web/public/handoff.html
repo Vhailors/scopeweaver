@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Context handoff</title><link rel="stylesheet" href="handoff.css"><script src="handoff.js" defer></script></head>
+<body><main>
+<a id="back" class="back" href="/">Back to workspace</a>
+<header><p class="eyebrow">CONTEXT, CONNECTED</p><h1 id="heading">Context handoff</h1><p id="subtitle">Move the context. Keep a human in control.</p></header>
+<div class="layout"><aside><h2>Selected context</h2><p id="source">Choose a handoff file, or receive from the other workspace.</p><ul id="items"></ul><label id="graph-control" hidden><input id="include-graph" type="checkbox" checked> Include graph, findings and linked assets</label><details><summary>Review exact payload</summary><pre id="preview">No data loaded.</pre></details><p class="note">Source IDs and relationships stay in the reference snapshot. Files, raw traffic, credentials and LLM traces are not requested. Known secret fields are masked; review free text before sharing.</p></aside>
+<form id="form"><label>Template<select id="template"><option value="custom">Custom handoff</option><option value="review">Review &amp; summarize</option><option value="plan">Plan next steps</option><option value="followup">Follow up on selected context</option></select></label><div class="template-save"><input id="template-name" maxlength="80" placeholder="Template name" aria-label="Template name"><button id="save-template" type="button" class="secondary">Save template</button></div><p class="note">Saved templates keep goal and intent in this browser, not source data or human input.</p>
+<label>Title<input id="title" maxlength="240" required placeholder="A clear name for this handoff"></label>
+<label>Goal<textarea id="goal" maxlength="10000" rows="3" required placeholder="What should the next workspace achieve?"></textarea></label>
+<label>Requested intent<textarea id="intent" maxlength="10000" rows="3" required placeholder="What specifically should be considered or done?"></textarea></label>
+<label>Human input<textarea id="human-input" maxlength="20000" rows="4" placeholder="Scope, constraints, questions and your judgment"></textarea></label>
+<label id="destination-label">Destination origin<input id="destination" type="url" placeholder="http://your-tailscale-host:8000"></label>
+<label class="consent"><input id="reviewed" type="checkbox" required> I reviewed this snapshot and the destination.</label>
+<div class="actions"><button id="send" type="submit" disabled>Send for review</button><button id="download" type="button" class="secondary" disabled>Download handoff</button></div>
+<label id="file-label" class="file">Import a handoff file<input id="file" type="file" accept="application/json,.json"></label>
+<button id="receive" type="button" class="secondary" hidden>Receive from source workspace</button>
+<p id="status" role="status" aria-live="polite">Loading…</p><a id="result" href="/" hidden>Open created draft</a>
+<p class="note">Imports never start workers. ScopeWeaver tasks are paused; Cairn projects are stopped with bootstrap disabled. Review in the destination before any separate start action.</p>
+</form></div></main></body></html>

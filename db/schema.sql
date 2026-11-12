@@ -1543,3 +1543,9 @@ ALTER TABLE chat_control_gates ADD COLUMN IF NOT EXISTS closed BOOLEAN NOT NULL 
 ALTER TABLE chat_control_inputs ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en';
 ALTER TABLE chat_control_runs ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en';
 ALTER TABLE chat_control_inputs ADD COLUMN IF NOT EXISTS source_kind TEXT NOT NULL DEFAULT 'user';
+
+CREATE TABLE IF NOT EXISTS integration_handoffs (
+    id TEXT PRIMARY KEY,
+    task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

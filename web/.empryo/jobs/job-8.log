@@ -1,0 +1,12 @@
+$ next dev --hostname 127.0.0.1 --port 18788
+▲ Next.js 16.4.3 (Turbopack)
+- Local:         http://127.0.0.1:18788
+- Network:       http://127.0.0.1:18788
+✓ Ready in 822ms
+✓ Running next.config.mjs took 31ms
+
+ GET /function/tasks 200 in 3.1s (next.js: 2.5s, proxy.ts: 74ms, application-code: 580ms)
+ GET /function/tasks 200 in 3.4s (next.js: 2.3s, proxy.ts: 331ms, application-code: 824ms)
+ GET /function/tasks 200 in 274ms (next.js: 60ms, proxy.ts: 21ms, application-code: 194ms)
+ GET /function/tasks 200 in 620ms (next.js: 230ms, proxy.ts: 66ms, application-code: 324ms)
+[?25h

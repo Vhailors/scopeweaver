@@ -1,0 +1,15 @@
+{
+  "scope": "http://127.0.0.1:18788",
+  "cairn": "http://127.0.0.1:18000",
+  "checks": [
+    "Five atomically paused tasks; duplicate requests return the original IDs",
+    "Invalid versions and source origins rejected",
+    "Non-JSON requests rejected; concurrent retries create one draft in each system",
+    "Native task selection \u2192 five-item popup transfer \u2192 stopped Cairn project; graph, asset, constraint and report snapshots preserved",
+    "Templates saved; mobile has no horizontal overflow; insecure-HTTP UUID fallback works",
+    "Native Cairn project \u2192 ScopeWeaver popup \u2192 paused task",
+    "Offline import, secret-field masking and text-only rendering verified",
+    "No start/resume/bootstrap requests or browser errors"
+  ],
+  "status": "PASS"
+}

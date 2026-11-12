@@ -1,0 +1,16 @@
+
+  ScopeWeaver
+  Autonomous AI penetration-testing system
+  Version dev  ·  linux/amd64  ·  go1.26.3  ·  Listening on 127.0.0.1:18787
+
+2026/10/30 14:09:02 [config] Configuration file: /home/devuser/Documents/Projects/scopeweaver/.worktrees/scopeweaver-cairn-handoff/config.json (not found; using ARTEX_PG_DSN only)
+2026/10/30 14:09:02 [pg] Database configuration source: environment variable ARTEX_PG_DSN
+2026/10/30 14:09:03 [mcp] Browser MCP capture proxy configuration removed
+2026/10/30 14:09:03 [config] Skill directory: /home/devuser/Documents/Projects/scopeweaver/.worktrees/scopeweaver-cairn-handoff/skills
+2026/10/30 14:09:03 [auth] New JWT key written to jwt.key
+2026/10/30 14:09:03 [tools] Refreshed orchestration/platform schemas to code defaults (one-time)
+2026/10/30 14:09:03 [reporter] Seeded report-writer agent and finding trigger
+2026/10/30 14:09:03 [custom-tool] Automatically detected Python interpreter: /usr/bin/python3
+2026/10/30 14:09:03 [engine] no LLM provider configured — engine idle until set via /api/llm or env
+2026/10/30 14:09:03 ScopeWeaver dev backend listening on 127.0.0.1:18787 (data=./data-handoff-verify, workers=3)
+2026/10/30 14:22:11 shutting down...

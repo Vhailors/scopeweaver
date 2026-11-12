@@ -144,6 +144,8 @@ func (d *DB) CreateTask(description, goal string, llmProfileID *int64, timeoutSe
 // with the task/exploration row.
 type TaskCreateOptions struct {
 	// Language is persisted atomically in the existing settings table; empty preserves legacy callers.
+	HandoffID            string
+	Paused               bool
 	Language             locale.Lang
 	Name                 string // Optional task name; empty means unnamed.
 	CategoryID           *int64
@@ -230,10 +232,15 @@ VALUES ($1, 'fact', $2, 0, 'origin', 'system')`, expID, string(originPayload)); 
 		CoverageEnabled: coverageEnabled,
 	}
 	if err := tx.QueryRow(`
-INSERT INTO tasks(name, category_id, description, goal, exploration_id, llm_profile_id, active_llm_profile_id, timeout_seconds, plan_heartbeat_seconds, coverage_enabled)
-VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9)
-RETURNING id, status, paused, created_at`, opts.Name, opts.CategoryID, description, goal, expID, active, opts.TimeoutSeconds, opts.PlanHeartbeatSeconds, coverageEnabled).Scan(&t.ID, &t.Status, &t.Paused, &t.CreatedAt); err != nil {
+INSERT INTO tasks(name, category_id, description, goal, exploration_id, llm_profile_id, active_llm_profile_id, timeout_seconds, plan_heartbeat_seconds, coverage_enabled, paused)
+VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9,$10)
+RETURNING id, status, paused, created_at`, opts.Name, opts.CategoryID, description, goal, expID, active, opts.TimeoutSeconds, opts.PlanHeartbeatSeconds, coverageEnabled, opts.Paused).Scan(&t.ID, &t.Status, &t.Paused, &t.CreatedAt); err != nil {
 		return nil, err
+	}
+	if opts.HandoffID != "" {
+		if _, err := tx.Exec(`INSERT INTO integration_handoffs(id, task_id) VALUES ($1,$2)`, opts.HandoffID, t.ID); err != nil {
+			return nil, err
+		}
 	}
 	if opts.Language != "" {
 		if _, err := tx.Exec(`INSERT INTO settings(key,value) VALUES ($1,$2)`, "task_language."+strconv.FormatInt(t.ID, 10), string(opts.Language)); err != nil {
