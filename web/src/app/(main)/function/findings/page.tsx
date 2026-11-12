@@ -958,6 +958,7 @@ export default function FindingsPage() {
             {selectedIds.size > 0 && (
               <span className="text-xs text-muted-foreground tabular-nums">{swt("interface.m0398")}{" "}{selectedIds.size} {swt("interface.m0328")}</span>
             )}
+            <Button size="sm" variant="outline" disabled={selectedIds.size === 0 || selectedIds.size > 100} title="Select 1–100 findings to hand off" onClick={() => window.location.assign(`/handoff.html?system=scopeweaver&finding_ids=${encodeURIComponent([...selectedIds].join(","))}`)}>Handoff to Cairn{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</Button>
             <Button size="sm" variant="outline" onClick={openExport}>
               <DownloadIcon /> {swt("interface.m0399")}</Button>
           </div>

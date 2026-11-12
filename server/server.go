@@ -674,6 +674,9 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /api/tasks", s.listTasks)
 	mux.HandleFunc("POST /api/tasks", s.createTask)
+	mux.HandleFunc("POST /api/handoffs", s.importHandoff)
+	mux.HandleFunc("GET /api/findings/handoff", s.exportSelectedFindingContext)
+	mux.HandleFunc("GET /api/tasks/{id}/handoff", s.exportHandoffContext)
 	mux.HandleFunc("GET /api/task-categories", s.pgListTaskCategories)
 	mux.HandleFunc("POST /api/task-categories", s.pgCreateTaskCategory)
 	mux.HandleFunc("PATCH /api/task-categories/{id}", s.pgRenameTaskCategory)

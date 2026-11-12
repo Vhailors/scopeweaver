@@ -28,6 +28,9 @@ func (s *Server) webuiHandler() http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		if strings.HasPrefix(p, "handoff.") {
+			w.Header().Set("Cache-Control", "no-store")
+		}
 		if p == "" {
 			p = "index.html"
 		}

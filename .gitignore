@@ -63,3 +63,5 @@ Thumbs.db
 /scopeweaver.old
 /scopeweaver.failed
 /scopeweaver.upgrade.json
+.empryo
+.worktrees/

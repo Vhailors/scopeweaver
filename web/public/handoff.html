@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Context handoff</title><link rel="stylesheet" href="handoff.css?v=findings-2"><script src="handoff.js?v=findings-2" defer></script></head>
+<body><main>
+<a id="back" class="back" href="/">Back to workspace</a>
+<header><p class="eyebrow">CONTEXT, CONNECTED</p><h1 id="heading">Context handoff</h1><p id="subtitle">Send once or reuse a template. No template name is required to send.</p></header>
+<div class="layout"><aside><h2>Selected context</h2><p id="source">Choose a handoff file, or receive from the other workspace.</p><ul id="items"></ul>
+<section id="findings-section" hidden><label id="mode-label">Handoff contents<select id="context-mode"><option value="tasks">Selected task context</option><option value="findings">Specific findings only</option></select></label><div id="findings-picker"><h2>Choose findings</h2><p class="note">Only checked findings, their reports, linked assets and constraints are sent. Other findings and full task graphs are excluded.</p><div class="finding-actions"><button id="findings-all" type="button" class="secondary">Check all</button><button id="findings-none" type="button" class="secondary">Clear</button></div><p id="finding-count" class="note"></p><div id="finding-choices"></div></div></section>
+<label id="graph-control" hidden><input id="include-graph" type="checkbox" checked> Include graph, findings and linked assets</label><details><summary>Review exact payload</summary><pre id="preview">No data loaded.</pre></details><p class="note">Source IDs and relationships stay in the reference snapshot. Files, raw traffic, credentials and LLM traces are not requested. Known secret fields are masked; review free text before sharing.</p></aside>
+<form id="form"><section id="empty-state"><h2>Receive a handoff</h2><p>This screen needs source data first. To send, select tasks or findings in ScopeWeaver, or open a Cairn project.</p><p><a id="choose-findings" href="/function/findings">Choose specific findings in ScopeWeaver</a></p><p><a id="choose-tasks" href="/function/tasks">Choose tasks in ScopeWeaver</a></p></section>
+<fieldset id="composer" hidden disabled><label>Instructions<select id="template"><option value="review" selected>Review &amp; summarize</option><option value="plan">Plan next steps</option><option value="followup">Follow up on selected context</option><option value="custom">Write my own instructions</option></select></label><p class="note">Sending is a one-off action. Saving a reusable template is optional.</p>
+<label>Title<input id="title" maxlength="240" required placeholder="A clear name for this handoff"></label>
+<label>Goal<textarea id="goal" maxlength="10000" rows="3" required placeholder="What should the next workspace achieve?"></textarea></label>
+<label>Requested intent<textarea id="intent" maxlength="10000" rows="3" required placeholder="What specifically should be considered or done?"></textarea></label>
+<label>Human input<textarea id="human-input" maxlength="20000" rows="4" placeholder="Scope, constraints, questions and your judgment"></textarea></label>
+<details id="save-template-panel"><summary>Save these instructions as a reusable template (optional)</summary><div class="template-save"><input id="template-name" maxlength="80" placeholder="Name for a reusable template" aria-label="Template name"><button id="save-template" type="button" class="secondary" disabled>Save template</button></div><p id="template-status" class="note" role="status">A name is only needed to save a template, never to send this handoff.</p></details>
+<label id="destination-label">Destination origin<input id="destination" type="url" placeholder="http://your-tailscale-host:8000"></label>
+<label class="consent"><input id="reviewed" type="checkbox" required> I reviewed the selected context and the destination.</label>
+<div class="actions"><button id="send" type="submit" disabled>Send for review</button><button id="download" type="button" class="secondary" disabled>Download handoff</button></div></fieldset>
+<button id="cancel-transfer" type="button" class="secondary" hidden>Cancel transfer and edit</button>
+<label id="file-label" class="file">Import a handoff file<input id="file" type="file" accept="application/json,.json"></label>
+<button id="receive" type="button" class="secondary" hidden>Receive from source workspace</button>
+<p id="status" role="status" aria-live="polite">Loading…</p><a id="result" href="/" hidden>Open created draft</a>
+<p class="note">Imports never start workers. ScopeWeaver tasks are paused; Cairn projects are stopped with bootstrap disabled. Review in the destination before any separate start action.</p>
+</form></div></main></body></html>
