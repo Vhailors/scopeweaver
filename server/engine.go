@@ -917,10 +917,34 @@ func (e *Engine) plannerLoop(ctx context.Context, t *Task) {
 
 func (e *Engine) workerLoop(ctx context.Context, t *Task, name string) {
 	for {
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return
-		default:
+		}
+		if e.IsDeleting(t.ID) {
+			return
+		}
+		// Pause, settlement, and terminal status live in memory. snapshotFor
+		// reads Postgres, so these waits must happen first. The loop stays
+		// alive: Run() will not start a second set of workers while started
+		// is set, and a later resume has to be picked up here.
+		switch {
+		case isTerminalStatus(e.m.TaskStatus(t.ID)):
+			// Done, failed, and timed-out tasks must not claim leftover intents.
+			if sleepCtx(ctx, 5*time.Second) {
+				return
+			}
+			continue
+		case e.IsPaused(t.ID):
+			if sleepCtx(ctx, time.Second) {
+				return
+			}
+			continue
+		case e.isSettling(t.ID):
+			// Active workers wrap up while the coordinator drains them.
+			if sleepCtx(ctx, time.Second) {
+				return
+			}
+			continue
 		}
 		_, worker := e.snapshotFor(t)
 		if worker == nil {
@@ -928,27 +952,6 @@ func (e *Engine) workerLoop(ctx context.Context, t *Task, name string) {
 				return
 			}
 			continue
-		}
-		if e.IsPaused(t.ID) {
-			if sleepCtx(ctx, 1000*time.Millisecond) {
-				return
-			}
-			continue // user-paused: don't claim/execute intents
-		}
-		if e.IsDeleting(t.ID) {
-			return
-		}
-		if e.isSettling(t.ID) {
-			if sleepCtx(ctx, 1000*time.Millisecond) {
-				return
-			}
-			continue // During timeout settlement, claim no new intents; active workers wrap up while the coordinator drains them.
-		}
-		if isTerminalStatus(e.m.TaskStatus(t.ID)) {
-			if sleepCtx(ctx, 1000*time.Millisecond) {
-				return
-			}
-			continue // Terminal tasks (done/failed/timeout) must not claim leftover intents after completion.
 		}
 		if !e.beginTaskOperation(t.ID) {
 			return

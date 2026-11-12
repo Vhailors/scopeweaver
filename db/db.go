@@ -137,6 +137,15 @@ func Open(dsn string) (*DB, error) {
 		sqlDB.Close()
 		return nil, locale.Errorf("ping postgres (%s): %w", config.Redact(dsn), err)
 	}
+	// database/sql defaults to unlimited open connections and two idle ones.
+	// Concurrent callers then dial a fresh session per query and close it
+	// immediately, which is enough to pass Postgres max_connections.
+	// 32 stays under a default limit of 100, including reserved superuser
+	// slots, and idle sessions are kept so the next query reuses them.
+	sqlDB.SetMaxOpenConns(32)
+	sqlDB.SetMaxIdleConns(32)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 	d := &DB{sqlDB}
 	// pgx runs multi-statement Exec via the simple protocol when there are no args.
 	// Keep the dedicated lock connection checked out until both DDL and seeding

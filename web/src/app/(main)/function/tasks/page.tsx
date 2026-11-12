@@ -812,7 +812,8 @@ export default function TasksPage() {
                   </button>
                 )}
               </div>
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as TaskStatus | "all")}>
+              <Button variant="outline" onClick={() => window.location.assign("/handoff.html?system=scopeweaver")}>Receive handoff</Button>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as TaskStatus | "all")}> 
                 <SelectTrigger className="w-36">
                   <SelectValue placeholder={swt("interface.m0191")} />
                 </SelectTrigger>
@@ -850,6 +851,7 @@ export default function TasksPage() {
                   <span className="text-xs tabular-nums">{swt("interface.m0398")}{" "}{selectedIds.size} {swt("interface.m0862")}</span>
                   <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
                     {swt("interface.m0863")}</Button>
+                  <Button size="sm" variant="outline" disabled={selectedIds.size > 100} onClick={() => window.location.assign(`/handoff.html?system=scopeweaver&ids=${encodeURIComponent([...selectedIds].join(","))}`)}>Handoff to Cairn</Button>
                   {pausableTaskIDs.length > 0 && (
                     <Button
                       size="sm"
