@@ -1,0 +1,27 @@
+Go build: Success
+
+  ScopeWeaver
+  Autonomous AI penetration-testing system
+  Version dev  ·  linux/amd64  ·  go1.26.3  ·  Listening on 127.0.0.1:9597
+
+2026/11/01 12:27:43 [config] Configuration file: /tmp/scopeweaver-cve-checks/config.json (not found; using ARTEX_PG_DSN only)
+2026/11/01 12:27:43 [pg] Database configuration source: environment variable ARTEX_PG_DSN
+2026/11/01 12:27:43 [mcp] Browser MCP capture proxy configuration removed
+2026/11/01 12:27:43 [config] Skill directory: /tmp/scopeweaver-cve-checks/skills
+2026/11/01 12:27:43 [engine] no LLM provider configured — engine idle until set via /api/llm or env
+2026/11/01 12:27:43 ScopeWeaver dev backend listening on 127.0.0.1:9597 (data=/tmp/scopeweaver-cve-checks/data, workers=3)
+2026/11/01 12:28:01 [vulnerability-review] provider finished run 4df513d75582dc1775a2b8803be11a98: <nil> (context: <nil>)
+2026/11/01 12:28:02 [vulnerability-review] provider finished run 3b0178d98e78b578b423ccf55a5c669c: <nil> (context: <nil>)
+2026/11/01 12:28:02 [vulnerability-review] provider finished run f1d79ddc970f18c06387f997363920a9: <nil> (context: <nil>)
+2026/11/01 12:28:02 [vulnerability-review] provider finished run 385ae06485e514d67cef76d9e3cbf461: <nil> (context: <nil>)
+2026/11/01 12:28:02 [vulnerability-review] provider finished run 078684f467adec56ef15916dac0502ae: no component could be checked; previous evidence remains unchanged (context: context canceled)
+2026/11/01 12:28:03 [vulnerability-review] provider finished run b5f4dd99575209cdb2b8998a49e1a495: <nil> (context: <nil>)
+2026/11/01 12:28:06 [vulnerability-review] provider finished run 253787564f42fa243bc9996c78b98186: <nil> (context: <nil>)
+2026/11/01 12:28:44 [vulnerability-review] provider finished run 533b0534e9acc1fc16e977ca03e95bbf: <nil> (context: <nil>)
+2026/11/01 12:29:45 [vulnerability-review] provider finished run 11a64933bbd08a9be299b1a36b301453: <nil> (context: <nil>)
+2026/11/01 12:30:45 [vulnerability-review] provider finished run 4d31bc94cd7f024d5025c61faa4a586c: <nil> (context: <nil>)
+2026/11/01 12:30:45 [vulnerability-review] provider finished run 4e22b39055a7c0a1bc6b0124b5f75513: <nil> (context: <nil>)
+2026/11/01 12:30:46 [vulnerability-review] provider finished run 04134e897b22bcdb681cd47e760bc854: <nil> (context: <nil>)
+2026/11/01 12:30:46 [vulnerability-review] provider finished run 3805962e6c948b778962f6786aa38c67: no component could be checked; previous evidence remains unchanged (context: context canceled)
+2026/11/01 12:30:47 [vulnerability-review] provider finished run 22a4f4cbab05df9add006728ab79c4d9: <nil> (context: <nil>)
+2026/11/01 12:37:35 shutting down...

@@ -29,6 +29,7 @@ import (
 	"github.com/Autumn-27/artex/opencodesdk"
 	"github.com/Autumn-27/artex/report"
 	"github.com/Autumn-27/artex/traffic"
+	"github.com/Autumn-27/artex/vulnreview"
 	"github.com/Autumn-27/norma/llm"
 	actool "github.com/Autumn-27/norma/tool"
 	"github.com/Autumn-27/norma/transcript"
@@ -129,8 +130,9 @@ type Server struct {
 	archiveWake chan struct{}
 	archiveWG   sync.WaitGroup
 	// Startup and periodic DB users must finish before the manager closes stores.
-	backgroundWG sync.WaitGroup
-	side         *sideQuestionState
+	backgroundWG         sync.WaitGroup
+	vulnerabilityReviews *vulnreview.Service
+	side                 *sideQuestionState
 }
 
 // provEntry is a cached provider + its config for one LLM profile id.
@@ -287,6 +289,7 @@ func newServer(ctx context.Context, m *Manager, skillDir string, dataDir string,
 	s.wireInterceptReviewer() // LLM fallback approval judges commands that match no interception rule.
 	if m.pg != nil {
 		m.startScheduler(s) // Register ownership before launch, after recovery and task restoration.
+		s.startVulnerabilityReviews()
 	}
 	return s, nil
 }
@@ -707,6 +710,7 @@ func (s *Server) chatAgentRef() *agent.ChatAgent {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	s.registerSideRoutes(mux)
+	s.registerVulnerabilityReviewRoutes(mux)
 
 	// Auth routes — exempt from JWT check (handled in requireAuth)
 	mux.HandleFunc("GET /api/auth/status", s.authStatus)

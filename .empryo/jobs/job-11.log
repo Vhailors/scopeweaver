@@ -1,0 +1,13 @@
+Go build: Success
+
+  ScopeWeaver
+  Autonomous AI penetration-testing system
+  Version dev  ·  linux/amd64  ·  go1.26.3  ·  Listening on 127.0.0.1:9597
+
+2026/11/01 11:45:52 [config] Configuration file: /tmp/scopeweaver-cve-checks/config.json (not found; using ARTEX_PG_DSN only)
+2026/11/01 11:45:52 [pg] Database configuration source: environment variable ARTEX_PG_DSN
+2026/11/01 11:45:52 [mcp] Browser MCP capture proxy configuration removed
+2026/11/01 11:45:52 [config] Skill directory: /tmp/scopeweaver-cve-checks/skills
+2026/11/01 11:45:52 [engine] no LLM provider configured — engine idle until set via /api/llm or env
+2026/11/01 11:45:52 ScopeWeaver dev backend listening on 127.0.0.1:9597 (data=/tmp/scopeweaver-cve-checks/data, workers=3)
+2026/11/01 12:23:09 shutting down...

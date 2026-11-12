@@ -70,6 +70,7 @@ export const sidebarItems: NavGroup[] = [
       { id: "dashboard", get title() { return swt("interface.m2871"); }, url: "/dashboard", icon: LayoutDashboard },
       { id: "chat", get title() { return swt("interface.m2872"); }, url: "/chat", icon: MessageSquare },
       { id: "tasks", get title() { return swt("interface.m0190"); }, url: "/function/tasks", icon: Target },
+      { id: "vulnerabilities", get title() { return swt("vulnerability.title"); }, url: "/vulnerabilities", icon: ShieldAlert },
       { id: "findings", get title() { return swt("interface.m0188"); }, url: "/function/findings", icon: Bug },
       { id: "traffic", get title() { return swt("interface.m1067"); }, url: "/function/traffic", icon: Activity },
       { id: "commands", get title() { return swt("interface.m0287"); }, url: "/function/commands", icon: Terminal },

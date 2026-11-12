@@ -1,0 +1,21 @@
+▲ Next.js 16.4.3 (Turbopack)
+- Local:         http://127.0.0.1:3302
+- Network:       http://127.0.0.1:3302
+✓ Ready in 1211ms
+✓ Running next.config.mjs took 54ms
+
+○ Compiling /login ...
+ GET /login 200 in 5.1s (next.js: 4.7s, proxy.ts: 3ms, application-code: 404ms)
+○ Compiling /function/tasks ...
+ GET /function/tasks 200 in 5.5s (next.js: 5.2s, proxy.ts: 6ms, application-code: 228ms)
+ GET /login 200 in 300ms (next.js: 210ms, proxy.ts: 8ms, application-code: 83ms)
+ GET /function/tasks 200 in 308ms (next.js: 209ms, proxy.ts: 8ms, application-code: 91ms)
+ GET /vulnerabilities 200 in 1822ms (next.js: 1744ms, proxy.ts: 5ms, application-code: 73ms)
+ GET /vulnerabilities 200 in 128ms (next.js: 40ms, proxy.ts: 18ms, application-code: 70ms)
+ GET /vulnerabilities 200 in 136ms (next.js: 75ms, proxy.ts: 5ms, application-code: 56ms)
+ GET /vulnerabilities 200 in 57ms (next.js: 10ms, proxy.ts: 5ms, application-code: 42ms)
+ GET /vulnerabilities 200 in 123ms (next.js: 56ms, proxy.ts: 7ms, application-code: 60ms)
+ GET /vulnerabilities 200 in 65ms (next.js: 17ms, proxy.ts: 6ms, application-code: 42ms)
+ GET /vulnerabilities 200 in 155ms (next.js: 98ms, proxy.ts: 11ms, application-code: 46ms)
+ GET /vulnerabilities 200 in 105ms (next.js: 23ms, proxy.ts: 9ms, application-code: 73ms)
+[?25h

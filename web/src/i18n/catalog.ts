@@ -14,15 +14,9 @@ import * as providers from "./messages/providers.ts";
 import * as settings from "./messages/settings.ts";
 import * as zhHans from "./messages/zh-hans.ts";
 import * as zhHant from "./messages/zh-hant.ts";
+import * as vulnerability from "./messages/vulnerability.ts";
 
-const namespaces = {
-  providers,
-  settings,
-  english,
-  interface: interfaceMessages,
-  app,
-  common,
-};
+const namespaces = { providers, settings, english, interface: interfaceMessages, app, common, vulnerability };
 
 type Namespaces = typeof namespaces;
 type NamespaceName = keyof Namespaces & string;
@@ -40,14 +34,7 @@ function namespaceTables(locale: "en" | "ko"): NamespaceCatalogs {
 }
 
 // Each new catalog is registered here; runtime support comes from definitions.
-const resources = {
-  en: namespaceTables("en"),
-  ko: namespaceTables("ko"),
-  "zh-Hans": zhHans,
-  "zh-Hant": zhHant,
-  ja,
-  es,
-} satisfies Record<Locale, NamespaceCatalogs>;
+const resources = { en: namespaceTables("en"), ko: namespaceTables("ko"), "zh-Hans": zhHans, "zh-Hant": zhHant, ja, es } satisfies Record<Locale, NamespaceCatalogs>;
 
 export const catalogLocales = Object.keys(resources);
 

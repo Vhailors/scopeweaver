@@ -61,7 +61,7 @@ export function scanText(text, file = path.join(SRC_ROOT, "ordinary.tsx")) {
           property.initializer === node &&
           declaration &&
           ts.isVariableDeclaration(declaration) &&
-          ["app", "common", "english", "interfaceMessages", "providers", "settings"].includes(
+          ["app", "common", "english", "interfaceMessages", "providers", "settings", "vulnerability"].includes(
             declaration.name.getText(sf),
           )
         )

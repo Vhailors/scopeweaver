@@ -1,0 +1,17 @@
+Go build: Success
+
+  ScopeWeaver
+  Autonomous AI penetration-testing system
+  Version dev  ·  linux/amd64  ·  go1.26.3  ·  Listening on 127.0.0.1:9598
+
+2026/11/01 12:02:57 [config] Configuration file: /tmp/scopeweaver-cve-checks/config.json (not found; using ARTEX_PG_DSN only)
+2026/11/01 12:02:57 [pg] Database configuration source: environment variable ARTEX_PG_DSN
+2026/11/01 12:02:57 [mcp] Browser MCP capture proxy configuration removed
+2026/11/01 12:02:57 [config] Skill directory: /tmp/scopeweaver-cve-checks/skills
+2026/11/01 12:02:57 [engine] no LLM provider configured — engine idle until set via /api/llm or env
+2026/11/01 12:02:57 ScopeWeaver dev backend listening on 127.0.0.1:9598 (data=/tmp/scopeweaver-cve-checks/secondary-data, workers=3)
+2026/11/01 12:03:02 [vulnerability-review] provider finished run 6e20b2f3677ab88ecc87061b63d4128b: no package batch could be checked; previous evidence remains unchanged (context: <nil>)
+2026/11/01 12:03:03 [vulnerability-review] outbound stopped for run 835fce78885d0dde3e9ef0de0c3c0b1d: context canceled
+2026/11/01 12:03:03 [vulnerability-review] cancellation propagated for run 835fce78885d0dde3e9ef0de0c3c0b1d: context canceled
+2026/11/01 12:03:03 [vulnerability-review] provider finished run 835fce78885d0dde3e9ef0de0c3c0b1d: no package batch could be checked; previous evidence remains unchanged (context: context canceled)
+2026/11/01 12:05:33 shutting down...
