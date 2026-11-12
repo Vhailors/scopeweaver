@@ -1,0 +1,30 @@
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.41s)
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.54s)
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.33s)
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.25s)
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.25s)
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.35s)
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.36s)
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.43s)
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.45s)
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (2.23s)

@@ -1,0 +1,18 @@
+{
+  "result": "pass",
+  "production_changes": false,
+  "merged": false,
+  "activated": false,
+  "production_credentials_created": false,
+  "packages_passed": 18,
+  "consecutive_provider_journeys": 10,
+  "retries": 0,
+  "negative_control": "wrong-company HTTP request returned 200 instead of required 403 when the company predicate was removed; restored implementation passed",
+  "api_requests_recorded": 83,
+  "deletion_reconciliation": {
+    "exported_company_assets": 6,
+    "persisted_company_assets": 6
+  },
+  "coverage_limit": "Free text, URLs and arbitrary metadata require explicitly reviewed redacted publication; no automatic everything feed.",
+  "gate_history": "Initial shared-suite opt-in fixture misuse failed. Corrected runner matches CI; final complete package suite passed twice. Adapter and frontend gates passed. Negative control and ten standalone journeys passed; final embedded build passed."
+}

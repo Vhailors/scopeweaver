@@ -1,0 +1,42 @@
+{
+  "state": "succeeded",
+  "authorization": "captain chose Authorize VPS source update",
+  "source": "/home/devuser/Documents/Projects/scopeweaver",
+  "branch": "feat/provider-scr93",
+  "before_head": "75a706d3146f9537ebf2cabe00ca540b6b033a85",
+  "reviewed_head": "84cf0779665d5e32b7fc6b41acb9d95b8493c77b",
+  "existing_edits_before": {
+    "unstaged_diff_sha256": "56fe24c34c9ea14f6a7de57b49210847b2f849f1987e3a8994bddb432bb5a1f1",
+    "staged_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untracked_listing_sha256": "8f3e77c5ce791a19f5e08ffbf9408d1faae846d6dfcb234e35a418fca0c2c701",
+    "tracked_status_sha256": "8ff69ecc96679fd5835246085683d4c304eebc77cd1a29687241982573c68982"
+  },
+  "runtime_before": {
+    "container_id": "1d718b54499fd343a26aa30ecdec9ab5cd2f678c6e18c808496500e08ae9f5b1",
+    "image_id": "sha256:1bdf08c6981242d6d6f3553b474e1a6e5943725a5e9c9bbeaa5aa3d90ba2c595",
+    "running": "true",
+    "started_at": "2026-10-30T18:13:56.857778369Z",
+    "restart_count": "0"
+  },
+  "rebuild": false,
+  "restart": false,
+  "activation": false,
+  "production_credentials_created": false,
+  "merge_returncode": 0,
+  "after_head": "84cf0779665d5e32b7fc6b41acb9d95b8493c77b",
+  "existing_edits_after": {
+    "unstaged_diff_sha256": "56fe24c34c9ea14f6a7de57b49210847b2f849f1987e3a8994bddb432bb5a1f1",
+    "staged_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untracked_listing_sha256": "8f3e77c5ce791a19f5e08ffbf9408d1faae846d6dfcb234e35a418fca0c2c701",
+    "tracked_status_sha256": "8ff69ecc96679fd5835246085683d4c304eebc77cd1a29687241982573c68982"
+  },
+  "runtime_after": {
+    "container_id": "1d718b54499fd343a26aa30ecdec9ab5cd2f678c6e18c808496500e08ae9f5b1",
+    "image_id": "sha256:1bdf08c6981242d6d6f3553b474e1a6e5943725a5e9c9bbeaa5aa3d90ba2c595",
+    "running": "true",
+    "started_at": "2026-10-30T18:13:56.857778369Z",
+    "restart_count": "0"
+  },
+  "existing_edits_preserved": true,
+  "running_service_unchanged": true
+}

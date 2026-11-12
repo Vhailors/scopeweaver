@@ -1,0 +1,4 @@
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:233: source content escaped provider redaction boundary
+--- FAIL: TestProviderCompanyContractPG (0.54s)
+FAIL	github.com/Autumn-27/artex/server	0.597s

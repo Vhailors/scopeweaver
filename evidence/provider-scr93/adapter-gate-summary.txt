@@ -1,0 +1,2 @@
+PASS adapter npm ci, npm test, npm run check
+PASS existing adapter real backend/PostgreSQL gate

@@ -1,0 +1,19 @@
+PASS github.com/Autumn-27/artex/agent
+PASS github.com/Autumn-27/artex/cmd/artex
+PASS github.com/Autumn-27/artex/config
+PASS github.com/Autumn-27/artex/db
+PASS github.com/Autumn-27/artex/enrich
+PASS github.com/Autumn-27/artex/evidence
+PASS github.com/Autumn-27/artex/guard
+PASS github.com/Autumn-27/artex/intercept
+PASS github.com/Autumn-27/artex/llmpool
+PASS github.com/Autumn-27/artex/llmrec
+PASS github.com/Autumn-27/artex/locale
+PASS github.com/Autumn-27/artex/mcphttp
+PASS github.com/Autumn-27/artex/notify
+PASS github.com/Autumn-27/artex/report
+PASS github.com/Autumn-27/artex/selfupdate
+PASS github.com/Autumn-27/artex/server
+PASS github.com/Autumn-27/artex/sidequestion
+PASS github.com/Autumn-27/artex/traffic
+PASS shell syntax

@@ -1,0 +1,3 @@
+PASS company negative control: disabling the grant company predicate produced HTTP 200 instead of required HTTP 403. No response body was printed.
+PASS redaction negative control: bypassing the serializer made the real HTTP journey detect forbidden source content; its response body was suppressed.
+PASS restored positive control, with sanitized actual API evidence

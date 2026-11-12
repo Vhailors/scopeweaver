@@ -1,0 +1,1 @@
+PASS frontend npm ci, npm test, npm run build:static (Node >=22)

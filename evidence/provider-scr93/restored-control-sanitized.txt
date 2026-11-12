@@ -1,0 +1,3 @@
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.37s)

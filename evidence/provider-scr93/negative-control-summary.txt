@@ -1,0 +1,2 @@
+PASS negative control: removing the grant company predicate caused the real HTTP journey to fail at expected HTTP 403, got 200; response body was suppressed. Restored provider enforcement.
+PASS restored positive control

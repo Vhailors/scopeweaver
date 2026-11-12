@@ -1,0 +1,4 @@
+=== RUN   TestProviderCompanyContractPG
+    provider_http_test.go:395: expected HTTP 403, got 200 (body suppressed)
+--- FAIL: TestProviderCompanyContractPG (1.29s)
+FAIL	github.com/Autumn-27/artex/server	1.360s

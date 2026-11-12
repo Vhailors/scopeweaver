@@ -1,0 +1,21 @@
+PASS ten consecutive revised real HTTP/PostgreSQL journeys, no retries.
+provider_http_test.go:476: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.46s)
+provider_http_test.go:476: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.36s)
+provider_http_test.go:476: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.38s)
+provider_http_test.go:476: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.22s)
+provider_http_test.go:476: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.37s)
+provider_http_test.go:476: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.24s)
+provider_http_test.go:476: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.21s)
+provider_http_test.go:476: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.29s)
+provider_http_test.go:476: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.35s)
+provider_http_test.go:476: Deletion reconciliation: provider assets=6, persisted company assets=6
+--- PASS: TestProviderCompanyContractPG (1.26s)

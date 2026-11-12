@@ -1,0 +1,30 @@
+{
+  "result": "pass",
+  "automatic_report_before_publication": true,
+  "automatic_metadata_without_publication": true,
+  "body_checksum_independently_verified": true,
+  "requests_recorded": 89,
+  "statuses": [
+    200,
+    201,
+    400,
+    401,
+    403,
+    404,
+    405,
+    409,
+    410,
+    503
+  ],
+  "consecutive_journeys": 10,
+  "retries": 0,
+  "negative_controls": [
+    "company predicate removed: expected refusal failed with HTTP 200",
+    "serializer bypassed: forbidden source content detected"
+  ],
+  "required_package_gates": 18,
+  "activated": false,
+  "merged": false,
+  "production_credentials_created": false,
+  "scope_limit": "Known-pattern redaction and supported metadata only; unknown fields, raw traffic/code and unsupported historical content remain explicit exclusions. Not a universal secret classifier or production-corpus proof."
+}
