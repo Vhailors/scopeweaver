@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   smoke:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, vps]
     timeout-minutes: 20
     services:
       postgres:
