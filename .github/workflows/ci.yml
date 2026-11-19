@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   agent-adapter:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, vps]
     services:
       postgres:
         image: postgres:16-alpine
@@ -40,7 +40,7 @@ jobs:
           ARTEX_PG_DSN: postgres://scopeweaver_test:test_only_password@localhost:5432/scopeweaver_adapter_e2e?sslmode=disable
         run: go test ./server -run '^TestAgentAdapterE2E$' -count=1 -v
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, vps]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -81,7 +81,7 @@ jobs:
       - name: Test native Python and skill paths
         run: go test ./server -run '^Test(ExecPython|DetectPython.*|SkillRelPath|SkillFilePathsUseForwardSlashes)$' -count=1 -v
   backend:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, vps]
     services:
       postgres:
         image: postgres:16-alpine
